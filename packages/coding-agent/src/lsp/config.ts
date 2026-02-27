@@ -197,8 +197,17 @@ const LOCAL_BIN_PATHS: Array<{ markers: string[]; binDir: string }> = [
 ];
 
 /**
+ * IDE-managed LSP installation directories to check.
+ * These are checked after project-local bins but before $PATH.
+ */
+const IDE_LSP_DIRS: Array<{ base: string; binSuffix: string }> = [
+	// JetBrains LSP4IJ: ~/.lsp4ij/lsp/<server>/node_modules/.bin/
+	{ base: path.join(os.homedir(), ".lsp4ij", "lsp"), binSuffix: path.join("node_modules", ".bin") },
+];
+
+/**
  * Resolve a command to an executable path.
- * Checks project-local bin directories first, then falls back to $PATH.
+ * Checks project-local bin directories first, then IDE-managed LSP installations, then $PATH.
  *
  * @param command - The command name (e.g., "typescript-language-server")
  * @param cwd - Working directory to search from
@@ -213,6 +222,16 @@ export function resolveCommand(command: string, cwd: string): string | null {
 				return localPath;
 			}
 		}
+	}
+
+	// Check IDE-managed LSP installations
+	for (const { base, binSuffix } of IDE_LSP_DIRS) {
+		try {
+			const serverDir = path.join(base, command, binSuffix, command);
+			if (fs.existsSync(serverDir)) {
+				return serverDir;
+			}
+		} catch {}
 	}
 
 	// Fall back to $PATH
