@@ -242,4 +242,128 @@ describe("AsyncJobManager", () => {
 
 		await manager.waitForAll();
 	});
+
+	test("suppressDelivery prevents auto-delivery on success", async () => {
+		const completions: Array<{ jobId: string; text: string }> = [];
+		const manager = new AsyncJobManager({
+			onJobComplete: async (jobId, text) => {
+				completions.push({ jobId, text });
+			},
+		});
+
+		const jobId = manager.register("task", "quiet job", async () => "done silently", {
+			suppressDelivery: true,
+		});
+
+		await manager.waitForAll();
+		await manager.drainDeliveries({ timeoutMs: 2_000 });
+
+		expect(manager.getJob(jobId)?.status).toBe("completed");
+		expect(manager.getJob(jobId)?.resultText).toBe("done silently");
+		expect(completions).toHaveLength(0);
+	});
+
+	test("suppressDelivery prevents auto-delivery on failure", async () => {
+		const completions: Array<{ jobId: string; text: string }> = [];
+		const manager = new AsyncJobManager({
+			onJobComplete: async (jobId, text) => {
+				completions.push({ jobId, text });
+			},
+		});
+
+		const jobId = manager.register(
+			"task",
+			"quiet failing job",
+			async () => {
+				throw new Error("boom");
+			},
+			{ suppressDelivery: true },
+		);
+
+		await manager.waitForAll();
+		await manager.drainDeliveries({ timeoutMs: 2_000 });
+
+		expect(manager.getJob(jobId)?.status).toBe("failed");
+		expect(manager.getJob(jobId)?.errorText).toBe("boom");
+		expect(completions).toHaveLength(0);
+	});
+
+	test("deliverResult manually triggers exactly one delivery", async () => {
+		const completions: Array<{ jobId: string; text: string }> = [];
+		const manager = new AsyncJobManager({
+			onJobComplete: async (jobId, text) => {
+				completions.push({ jobId, text });
+			},
+		});
+
+		const jobId = manager.register("task", "suppressed", async () => "individual result", {
+			suppressDelivery: true,
+		});
+
+		await manager.waitForAll();
+		await manager.drainDeliveries({ timeoutMs: 2_000 });
+
+		// No auto-delivery happened
+		expect(completions).toHaveLength(0);
+
+		// Manual batch delivery
+		manager.deliverResult(jobId, "batch summary for all tasks");
+		await manager.drainDeliveries({ timeoutMs: 2_000 });
+
+		expect(completions).toEqual([{ jobId, text: "batch summary for all tasks" }]);
+	});
+
+	test("batch of N suppressed jobs produces zero auto-deliveries, one manual delivery", async () => {
+		const completions: Array<{ jobId: string; text: string }> = [];
+		const manager = new AsyncJobManager({
+			maxRunningJobs: 5,
+			onJobComplete: async (jobId, text) => {
+				completions.push({ jobId, text });
+			},
+		});
+
+		const jobIds: string[] = [];
+		for (let i = 0; i < 3; i++) {
+			const id = manager.register("task", `task-${i}`, async () => `result-${i}`, {
+				suppressDelivery: true,
+			});
+			jobIds.push(id);
+		}
+
+		await manager.waitForAll();
+		await manager.drainDeliveries({ timeoutMs: 2_000 });
+
+		// All 3 completed, zero auto-deliveries
+		for (const id of jobIds) {
+			expect(manager.getJob(id)?.status).toBe("completed");
+		}
+		expect(completions).toHaveLength(0);
+
+		// One manual batch delivery using first job's id
+		manager.deliverResult(jobIds[0], "3/3 succeeded, 0 failed");
+		await manager.drainDeliveries({ timeoutMs: 2_000 });
+
+		expect(completions).toHaveLength(1);
+		expect(completions[0]).toEqual({ jobId: jobIds[0], text: "3/3 succeeded, 0 failed" });
+	});
+
+	test("without suppressDelivery, N jobs still produce N auto-deliveries (baseline)", async () => {
+		const completions: Array<{ jobId: string; text: string }> = [];
+		const manager = new AsyncJobManager({
+			maxRunningJobs: 5,
+			onJobComplete: async (jobId, text) => {
+				completions.push({ jobId, text });
+			},
+		});
+
+		for (let i = 0; i < 3; i++) {
+			manager.register("task", `task-${i}`, async () => `result-${i}`);
+		}
+
+		await manager.waitForAll();
+		await manager.drainDeliveries({ timeoutMs: 2_000 });
+
+		// Without suppressDelivery, each job delivers independently
+		expect(completions).toHaveLength(3);
+	});
 });
