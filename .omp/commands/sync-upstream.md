@@ -31,29 +31,51 @@ git rev-list --count main..upstream/main    # behind
 git rev-list --count upstream/main..main    # ahead (local patches)
 ```
 
-List the local patches (ahead commits) and the most recent 15 upstream commits (behind).
+Present a structured report to the user:
 
-If `--dry-run` was passed, stop here and report.
+**Local patches (ahead of upstream):** List each with short SHA, subject line, and files touched.
 
-### 3. Stash dirty work
+**Upstream incoming (behind):** List all commits grouped by package/area (e.g., `packages/ai`, `packages/coding-agent`, `packages/tui`). For each group, show commit count and the subjects. Highlight any commits that touch the same files as local patches — these are conflict risks.
 
-If there are uncommitted changes, stash them before merging:
+**Conflict risk assessment:** Run `git merge-tree $(git merge-base HEAD upstream/main) HEAD upstream/main` or a dry merge to identify files that will conflict. Report them explicitly.
+
+**Stop here and ask the user for approval.** Present options:
+- Proceed with full merge
+- Cherry-pick specific commits only
+- Abort (just wanted the report)
+
+Do NOT continue to step 3 without explicit approval.
+
+If `--dry-run` was passed, stop here regardless of response.
+
+### 3. Stash and merge
+
+Only after approval in step 2.
+
+If there are uncommitted changes, stash them:
 
 ```bash
 git stash
 ```
 
-### 4. Merge upstream
-
 ```bash
 git merge upstream/main
 ```
 
-If there are conflicts:
+### 4. Resolve conflicts
 
+If there are conflicts, present each conflicted file to the user with:
+- The file path
+- Both sides of the conflict (ours vs theirs)
+- A recommended resolution with rationale
+
+**Ask the user to approve each resolution before applying it.** Do not batch-resolve without review.
+
+Standing rules:
 - **NEVER modify upstream CHANGELOG.md** — fork-local changes belong in `FORK_CHANGELOG.md` (gitignored). If the conflict is in a CHANGELOG, accept upstream's version entirely (`git checkout --theirs <file>`).
-- For code conflicts: read both sides, understand the intent, resolve with judgment. Prefer upstream's structure when the local change can be rebased on top.
-- After resolving all conflicts: `git add` the resolved files and `git merge --continue`.
+- For code conflicts: prefer upstream's structure when the local change can be cleanly reapplied on top.
+
+After all conflicts are resolved and approved: `git add` the resolved files and `git merge --continue`.
 
 ### 5. Pop stash
 
