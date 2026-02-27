@@ -101,6 +101,31 @@ function addUsageTotals(target: Usage, usage: Partial<Usage>): void {
 	target.cost.total += cost.total;
 }
 
+/**
+ * Build a compact delivery summary for batch task completion.
+ * Sent once as a follow-up instead of per-job notifications.
+ */
+function buildBatchDeliverySummary(
+	progressByTaskId: Map<string, AgentProgress>,
+	uniqueIds: string[],
+	taskItems: Array<{ id: string }>,
+	completedJobs: number,
+	failedJobs: number,
+): string {
+	const lines: string[] = [];
+	const successCount = completedJobs - failedJobs;
+	lines.push(`Background tasks complete: ${successCount}/${taskItems.length} succeeded, ${failedJobs} failed.`);
+	lines.push("");
+	for (let i = 0; i < taskItems.length; i++) {
+		const taskId = taskItems[i].id;
+		const uniqueId = uniqueIds[i];
+		const progress = progressByTaskId.get(taskId);
+		const status = progress?.status ?? "unknown";
+		lines.push(`- agent://${uniqueId} [${status}]`);
+	}
+	return lines.join("\n");
+}
+
 // Re-export types and utilities
 export { loadBundledAgents as BUNDLED_AGENTS } from "./agents";
 export { discoverCommands, expandCommand, getCommand } from "./commands";
@@ -296,8 +321,28 @@ export class TaskTool implements AgentTool<TaskSchema, TaskToolDetails, Theme> {
 							`Running background task ${taskItem.id}...`,
 							buildAsyncDetails("running", startedJobs[0]?.jobId ?? label) as unknown as Record<string, unknown>,
 						);
+						// Bridge fine-grained subprocess progress into async progress tracking
+						const bridgeUpdate = (update: { details?: TaskToolDetails }) => {
+							const sp = update.details?.progress?.[0];
+							if (sp && progress) {
+								progress.currentTool = sp.currentTool;
+								progress.currentToolArgs = sp.currentToolArgs;
+								progress.currentToolStartMs = sp.currentToolStartMs;
+								progress.lastIntent = sp.lastIntent;
+								progress.recentTools = sp.recentTools;
+								progress.recentOutput = sp.recentOutput;
+								progress.toolCount = sp.toolCount;
+								progress.tokens = sp.tokens;
+								progress.durationMs = sp.durationMs;
+							}
+							const primaryJobId = startedJobs[0]?.jobId ?? label;
+							onUpdate?.({
+								content: [{ type: "text", text: `Running ${taskItems.length} background tasks...` }],
+								details: buildAsyncDetails("running", primaryJobId),
+							});
+						};
 						try {
-							const result = await this.#executeSync(_toolCallId, singleParams, runSignal, undefined, [
+							const result = await this.#executeSync(_toolCallId, singleParams, runSignal, bridgeUpdate, [
 								uniqueId,
 							]);
 							const finalText = result.content.find(part => part.type === "text")?.text ?? "(no output)";
@@ -328,10 +373,20 @@ export class TaskTool implements AgentTool<TaskSchema, TaskToolDetails, Theme> {
 								) as unknown as Record<string, unknown>,
 							);
 							if (isDone) {
+								const batchState = failedJobs > 0 || failedSchedules.length > 0 ? "failed" : "completed";
 								emitAsyncUpdate(
-									failedJobs > 0 || failedSchedules.length > 0 ? "failed" : "completed",
+									batchState,
 									`Background task batch complete: ${completedJobs}/${taskItems.length} finished.`,
 								);
+								// Deliver one batch result instead of per-job notifications
+								const batchSummary = buildBatchDeliverySummary(
+									progressByTaskId,
+									uniqueIds,
+									taskItems,
+									completedJobs,
+									failedJobs,
+								);
+								manager.deliverResult(startedJobs[0]?.jobId ?? label, batchSummary);
 							}
 							return finalText;
 						} catch (error) {
@@ -357,6 +412,14 @@ export class TaskTool implements AgentTool<TaskSchema, TaskToolDetails, Theme> {
 									"failed",
 									`Background task batch complete with failures: ${failedJobs} failed.`,
 								);
+								const batchSummary = buildBatchDeliverySummary(
+									progressByTaskId,
+									uniqueIds,
+									taskItems,
+									completedJobs,
+									failedJobs,
+								);
+								manager.deliverResult(startedJobs[0]?.jobId ?? label, batchSummary);
 							}
 							throw error;
 						} finally {
@@ -365,6 +428,7 @@ export class TaskTool implements AgentTool<TaskSchema, TaskToolDetails, Theme> {
 					},
 					{
 						id: label,
+						suppressDelivery: true,
 						onProgress: (text, details) => {
 							const progressDetails =
 								(details as TaskToolDetails | undefined) ??
