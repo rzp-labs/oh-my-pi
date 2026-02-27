@@ -14,6 +14,7 @@ export interface AsyncJob {
 	label: string;
 	abortController: AbortController;
 	promise: Promise<void>;
+	suppressDelivery: boolean;
 	resultText?: string;
 	errorText?: string;
 }
@@ -42,6 +43,8 @@ export interface AsyncJobDeliveryState {
 export interface AsyncJobRegisterOptions {
 	id?: string;
 	onProgress?: (text: string, details?: Record<string, unknown>) => void | Promise<void>;
+	/** When true, job completion does not auto-enqueue a delivery. Use deliverResult() manually. */
+	suppressDelivery?: boolean;
 }
 
 export class AsyncJobManager {
@@ -94,6 +97,7 @@ export class AsyncJobManager {
 			label,
 			abortController,
 			promise: Promise.resolve(),
+			suppressDelivery: options?.suppressDelivery === true,
 		};
 
 		const reportProgress = async (text: string, details?: Record<string, unknown>): Promise<void> => {
@@ -117,7 +121,9 @@ export class AsyncJobManager {
 				}
 				job.status = "completed";
 				job.resultText = text;
-				this.#enqueueDelivery(id, text);
+				if (!job.suppressDelivery) {
+					this.#enqueueDelivery(id, text);
+				}
 				this.#scheduleEviction(id);
 			} catch (error) {
 				if (job.status === "cancelled") {
@@ -128,13 +134,23 @@ export class AsyncJobManager {
 				const errorText = error instanceof Error ? error.message : String(error);
 				job.status = "failed";
 				job.errorText = errorText;
-				this.#enqueueDelivery(id, errorText);
+				if (!job.suppressDelivery) {
+					this.#enqueueDelivery(id, errorText);
+				}
 				this.#scheduleEviction(id);
 			}
 		})();
 
 		this.#jobs.set(id, job);
 		return id;
+	}
+
+	/**
+	 * Manually enqueue a delivery for a job (or any arbitrary jobId + text).
+	 * Use when jobs were registered with suppressDelivery to trigger a single batch delivery.
+	 */
+	deliverResult(jobId: string, text: string): void {
+		this.#enqueueDelivery(jobId, text);
 	}
 
 	cancel(id: string): boolean {
