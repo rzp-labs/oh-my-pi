@@ -2,7 +2,8 @@
  * State manager for the Extension Control Center.
  * Handles data loading, tree building, filtering, and toggle persistence.
  */
-import { logger } from "@oh-my-pi/pi-utils";
+import * as path from "node:path";
+import { getProjectDir, logger } from "@oh-my-pi/pi-utils";
 import type { ContextFile } from "../../../capability/context-file";
 import type { ExtensionModule } from "../../../capability/extension-module";
 import type { Hook } from "../../../capability/hook";
@@ -253,7 +254,7 @@ export async function loadAllExtensions(cwd?: string, disabledIds?: string[]): P
 		for (const file of contextFiles.all) {
 			// Extract filename from path for display
 			const name = file.path.split("/").pop() || file.path;
-			const id = makeExtensionId("context-file", `${file.level}:${name}`);
+			const id = makeExtensionId("context-file", file.path);
 			const isDisabled = disabledExtensions.has(id);
 			const isShadowed = (file as { _shadowed?: boolean })._shadowed;
 			const providerEnabled = isProviderEnabled(file._source.provider);
@@ -278,7 +279,7 @@ export async function loadAllExtensions(cwd?: string, disabledIds?: string[]): P
 				id,
 				kind: "context-file",
 				name,
-				displayName: name,
+				displayName: contextFileDisplayName(file.path, name),
 				description: file.level === "user" ? "User-level context" : "Project-level context",
 				trigger: file.level,
 				path: file.path,
@@ -409,6 +410,19 @@ export function applyFilter(extensions: Extension[], query: string): Extension[]
 
 		return tokens.every(token => searchable.includes(token));
 	});
+}
+
+/**
+ * Build a short display name for a context file, showing its relative path for disambiguation.
+ */
+function contextFileDisplayName(filePath: string, fallbackName: string): string {
+	try {
+		const rel = path.relative(getProjectDir(), filePath);
+		if (!rel || rel.startsWith("..")) return fallbackName;
+		return rel;
+	} catch {
+		return fallbackName;
+	}
 }
 
 /**
