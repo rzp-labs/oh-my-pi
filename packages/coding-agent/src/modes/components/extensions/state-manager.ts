@@ -12,6 +12,7 @@ import type { Prompt } from "../../../capability/prompt";
 import type { Rule } from "../../../capability/rule";
 import type { Skill } from "../../../capability/skill";
 import type { SlashCommand } from "../../../capability/slash-command";
+import type { SSHHost } from "../../../capability/ssh";
 import type { CustomTool } from "../../../capability/tool";
 import type { SourceMeta } from "../../../capability/types";
 import {
@@ -293,6 +294,49 @@ export async function loadAllExtensions(cwd?: string, disabledIds?: string[]): P
 		logger.warn("Failed to load context-files capability", { error: String(error) });
 	}
 
+	// Load SSH hosts
+	try {
+		const sshHosts = await loadCapability<SSHHost>("ssh", loadOpts);
+		for (const host of sshHosts.all) {
+			const id = makeExtensionId("ssh-host", host.name);
+			const isDisabled = disabledExtensions.has(id);
+			const isShadowed = (host as { _shadowed?: boolean })._shadowed;
+			const providerEnabled = isProviderEnabled(host._source.provider);
+
+			let state: ExtensionState;
+			let disabledReason: "shadowed" | "provider-disabled" | "item-disabled" | undefined;
+
+			if (isDisabled) {
+				state = "disabled";
+				disabledReason = "item-disabled";
+			} else if (isShadowed) {
+				state = "shadowed";
+				disabledReason = "shadowed";
+			} else if (!providerEnabled) {
+				state = "disabled";
+				disabledReason = "provider-disabled";
+			} else {
+				state = "active";
+			}
+
+			extensions.push({
+				id,
+				kind: "ssh-host",
+				name: host.name,
+				displayName: host.name,
+				description: host.host + (host.port ? `:${host.port}` : ""),
+				trigger: undefined,
+				path: host._source.path,
+				source: sourceFromMeta(host._source),
+				state,
+				disabledReason,
+				raw: host,
+			});
+		}
+	} catch (error) {
+		logger.warn("Failed to load ssh capability", { error: String(error) });
+	}
+
 	return extensions;
 }
 
@@ -450,6 +494,8 @@ function getKindDisplayName(kind: ExtensionKind): string {
 			return "Hooks";
 		case "slash-command":
 			return "Slash Commands";
+		case "ssh-host":
+			return "SSH Hosts";
 		default:
 			return kind;
 	}
