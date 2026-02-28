@@ -11,6 +11,7 @@ import branchSummaryContextPrompt from "../prompts/compaction/branch-summary-con
 import compactionSummaryContextPrompt from "../prompts/compaction/compaction-summary-context.md" with { type: "text" };
 import type { OutputMeta } from "../tools/output-meta";
 import { formatOutputNotice } from "../tools/output-meta";
+import { DEFAULT_MAX_BYTES, truncateHeadBytes } from "./streaming-output";
 
 const COMPACTION_SUMMARY_TEMPLATE = compactionSummaryContextPrompt;
 const BRANCH_SUMMARY_TEMPLATE = branchSummaryContextPrompt;
@@ -26,11 +27,61 @@ export interface SkillPromptDetails {
 
 function getPrunedToolResultContent(message: ToolResultMessage): (TextContent | ImageContent)[] {
 	if (message.prunedAt === undefined) {
-		return message.content;
+		return clampToolResultContent(message.content);
 	}
 	const textBlocks = message.content.filter((content): content is TextContent => content.type === "text");
 	const text = textBlocks.map(block => block.text).join("") || "[Output truncated]";
 	return [{ type: "text", text }];
+}
+
+/**
+ * Defence-in-depth: clamp oversized text blocks before they reach the API.
+ * Individual tools (bash, grep, read, etc.) already apply their own limits,
+ * but custom/MCP/proxy tools loaded from disk may not.  This catch-all
+ * prevents a single tool result from consuming the entire context budget.
+ */
+function clampToolResultContent(content: (TextContent | ImageContent)[]): (TextContent | ImageContent)[] {
+	let totalBytes = 0;
+	for (const block of content) {
+		if (block.type === "text") {
+			totalBytes += Buffer.byteLength(block.text, "utf-8");
+		}
+	}
+	if (totalBytes <= DEFAULT_MAX_BYTES) return content;
+
+	// Truncate text blocks in order, preserving image block positions.
+	let bytesRemaining = DEFAULT_MAX_BYTES;
+	let textExhausted = false;
+	const result: (TextContent | ImageContent)[] = [];
+
+	for (const block of content) {
+		if (block.type !== "text") {
+			result.push(block);
+			continue;
+		}
+		if (textExhausted) continue;
+
+		const blockBytes = Buffer.byteLength(block.text, "utf-8");
+		if (blockBytes <= bytesRemaining) {
+			result.push(block);
+			bytesRemaining -= blockBytes;
+			continue;
+		}
+
+		// Block exceeds remaining budget -- byte-level truncation (UTF-8 safe).
+		const truncation = truncateHeadBytes(block.text, bytesRemaining);
+		if (truncation.text.length > 0) {
+			result.push({ type: "text", text: truncation.text });
+		}
+		textExhausted = true;
+	}
+
+	const outputBytes = DEFAULT_MAX_BYTES - bytesRemaining;
+	result.push({
+		type: "text",
+		text: `\n\n[Tool output truncated: ${outputBytes} of ${totalBytes} bytes kept (${DEFAULT_MAX_BYTES / 1024}KB limit)]`,
+	});
+	return result;
 }
 
 /**
