@@ -82,6 +82,12 @@ export class AwaitTool implements AgentTool<typeof awaitSchema, AwaitToolDetails
 			return this.#buildResult(manager, jobsToWatch);
 		}
 
+		// Pre-acknowledge deliveries for watched jobs: we'll return results inline,
+		// so async-result notifications are redundant. This must happen BEFORE blocking
+		// on job.promise because deliverResult() inside the job's run callback enqueues
+		// the delivery before the promise resolves (race condition).
+		manager.acknowledgeDeliveries(jobsToWatch.map(j => j.id));
+
 		// Block until at least one running job finishes or the call is aborted
 		const racePromises: Promise<unknown>[] = runningJobs.map(j => j.promise);
 
