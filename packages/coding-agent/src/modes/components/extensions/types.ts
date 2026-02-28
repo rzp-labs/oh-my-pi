@@ -16,7 +16,8 @@ export type ExtensionKind =
 	| "instruction"
 	| "context-file"
 	| "hook"
-	| "slash-command";
+	| "slash-command"
+	| "ssh-host";
 
 /**
  * Extension state (active, disabled, or shadowed).
