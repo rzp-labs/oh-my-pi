@@ -4,7 +4,6 @@
  * System instruction files (CLAUDE.md, AGENTS.md, GEMINI.md, etc.) that provide
  * persistent guidance to the agent.
  */
-import * as path from "node:path";
 import { defineCapability } from ".";
 import type { SourceMeta } from "./types";
 
@@ -28,13 +27,15 @@ export const contextFileCapability = defineCapability<ContextFile>({
 	id: "context-files",
 	displayName: "Context Files",
 	description: "Persistent instruction files (CLAUDE.md, AGENTS.md, etc.) that guide agent behavior",
-	// Deduplicate by scope: one user-level file, and one project-level file per directory depth.
-	// Within each depth level, higher-priority providers shadow lower-priority ones.
-	// This supports monorepo hierarchies where AGENTS.md exists at multiple ancestor levels.
-	// Clamp depth >= 0: files inside config subdirectories of an ancestor (e.g. .claude/, .github/)
-	// are same-scope as the ancestor itself.
-	key: file => (file.level === "user" ? "user" : `project:${Math.max(0, file.depth ?? 0)}`),
-	toExtensionId: file => `context-file:${file.level}:${path.basename(file.path)}`,
+	// Deduplicate by scope and path:
+	// - user-level: single global slot
+	// - ancestor files (depth >= 0): one per depth level; higher-priority providers shadow lower ones
+	// - descendant files (depth < 0, from downward walk): unique per path so all are preserved
+	key: file => {
+		if (file.level === "user") return "user";
+		const d = file.depth ?? 0;
+		return d < 0 ? `path:${file.path}` : `project:${d}`;
+	},
 	validate: file => {
 		if (!file.path) return "Missing path";
 		if (file.content === undefined) return "Missing content";
