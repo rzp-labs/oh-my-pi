@@ -82,27 +82,25 @@ export class AwaitTool implements AgentTool<typeof awaitSchema, AwaitToolDetails
 			return this.#buildResult(manager, jobsToWatch);
 		}
 
-		// Pre-acknowledge deliveries for watched jobs: we'll return results inline,
-		// so async-result notifications are redundant. This must happen BEFORE blocking
-		// on job.promise because deliverResult() inside the job's run callback enqueues
-		// the delivery before the promise resolves (race condition).
+		// Pre-suppress deliveries for watched jobs: the delivery loop fires
+		// onJobComplete as microtasks that run before allSettled resolves,
+		// so acknowledgeDeliveries in #buildResult would be too late.
+		// allSettled ensures no jobs are still running when we return,
+		// so the suppression doesn't orphan any notifications.
 		manager.acknowledgeDeliveries(jobsToWatch.map(j => j.id));
-
-		// Block until at least one running job finishes or the call is aborted
-		const racePromises: Promise<unknown>[] = runningJobs.map(j => j.promise);
+		const allSettled = Promise.allSettled(runningJobs.map(j => j.promise));
 
 		if (signal) {
 			const { promise: abortPromise, resolve: abortResolve } = Promise.withResolvers<void>();
 			const onAbort = () => abortResolve();
 			signal.addEventListener("abort", onAbort, { once: true });
-			racePromises.push(abortPromise);
 			try {
-				await Promise.race(racePromises);
+				await Promise.race([allSettled, abortPromise]);
 			} finally {
 				signal.removeEventListener("abort", onAbort);
 			}
 		} else {
-			await Promise.race(racePromises);
+			await allSettled;
 		}
 
 		if (signal?.aborted) {
