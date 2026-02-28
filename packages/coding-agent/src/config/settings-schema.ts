@@ -254,15 +254,6 @@ export const SETTINGS_SCHEMA = {
 			submenu: true,
 		},
 	},
-	normativeRewrite: {
-		type: "boolean",
-		default: false,
-		ui: {
-			tab: "agent",
-			label: "Normative rewrite",
-			description: "Rewrite tool call arguments to normalized format in session history",
-		},
-	},
 	repeatToolDescriptions: {
 		type: "boolean",
 		default: false,
@@ -737,7 +728,19 @@ export const SETTINGS_SCHEMA = {
 	// ─────────────────────────────────────────────────────────────────────────
 	"providers.webSearch": {
 		type: "enum",
-		values: ["auto", "exa", "brave", "jina", "kimi", "zai", "perplexity", "anthropic"] as const,
+		values: [
+			"auto",
+			"exa",
+			"brave",
+			"jina",
+			"kimi",
+			"zai",
+			"perplexity",
+			"anthropic",
+			"gemini",
+			"codex",
+			"synthetic",
+		] as const,
 		default: "auto",
 		ui: { tab: "services", label: "Web search provider", description: "Provider for web search tool", submenu: true },
 	},
