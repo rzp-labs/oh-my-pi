@@ -4,6 +4,7 @@
  * Uses the capability system to load MCP servers from multiple sources.
  */
 
+import * as path from "node:path";
 import { getMCPConfigPath } from "@oh-my-pi/pi-utils";
 import { mcpCapability } from "../capability/mcp";
 import type { SourceMeta } from "../capability/types";
@@ -104,8 +105,17 @@ export async function loadAllMCPConfigs(cwd: string, options?: LoadMCPConfigsOpt
 		? result.items
 		: result.items.filter(server => server._source.level !== "project");
 
-	// Load user-level disabled servers list
-	const disabledServers = new Set(await readDisabledServers(getMCPConfigPath("user", cwd)));
+	// Load disabled servers from user-level and (if enabled) project-level configs
+	const disabledSources = [readDisabledServers(getMCPConfigPath("user", cwd))];
+	if (enableProjectConfig) {
+		const projectMcpPath = getMCPConfigPath("project", cwd);
+		const projectMcpDir = path.dirname(projectMcpPath);
+		disabledSources.push(
+			readDisabledServers(projectMcpPath),
+			readDisabledServers(path.join(projectMcpDir, ".mcp.json")),
+		);
+	}
+	const disabledServers = new Set((await Promise.all(disabledSources)).flat());
 	// Convert to legacy format and preserve source metadata
 	let configs: Record<string, MCPServerConfig> = {};
 	let sources: Record<string, SourceMeta> = {};
