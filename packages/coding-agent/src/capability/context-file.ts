@@ -27,9 +27,9 @@ export const contextFileCapability = defineCapability<ContextFile>({
 	id: "context-files",
 	displayName: "Context Files",
 	description: "Persistent instruction files (CLAUDE.md, AGENTS.md, etc.) that guide agent behavior",
-	// Deduplicate by level: one user-level file, one project-level file
-	// Higher-priority providers shadow lower-priority ones at the same scope
-	key: file => file.level,
+	// Deduplicate by absolute path: each unique file survives, while the same
+	// file discovered by multiple providers deduplicates to the highest-priority entry
+	key: file => file.path,
 	validate: file => {
 		if (!file.path) return "Missing path";
 		if (file.content === undefined) return "Missing content";

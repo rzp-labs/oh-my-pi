@@ -1,10 +1,11 @@
 /**
  * AGENTS.md Provider
  *
- * Discovers standalone AGENTS.md files by walking up from cwd.
+ * Discovers standalone AGENTS.md files by walking up from cwd and down into subdirectories.
  * This handles AGENTS.md files that live in project root (not in config directories
  * like .codex/ or .gemini/, which are handled by their respective providers).
  */
+import * as fs from "node:fs";
 import * as path from "node:path";
 import { registerProvider } from "../capability";
 import { type ContextFile, contextFileCapability } from "../capability/context-file";
@@ -15,6 +16,61 @@ import { calculateDepth, createSourceMeta } from "./helpers";
 const PROVIDER_ID = "agents-md";
 const DISPLAY_NAME = "AGENTS.md";
 const MAX_DEPTH = 20; // Prevent walking up excessively far from cwd
+const WALK_DOWN_MAX_DEPTH = 4;
+const WALK_DOWN_MAX_FILES = 50;
+
+const EXCLUDED_DIRS = new Set(["node_modules", ".git"]);
+async function collectDescendantAgentsMd(
+	cwd: string,
+	dir: string,
+	depth: number,
+	maxDepth: number,
+	maxFiles: number,
+	found: Set<string>,
+	items: ContextFile[],
+): Promise<void> {
+	if (depth > maxDepth || items.length >= maxFiles) return;
+
+	let entries: fs.Dirent[];
+	try {
+		entries = await fs.promises.readdir(dir, { withFileTypes: true });
+	} catch {
+		return;
+	}
+
+	const subdirs: string[] = [];
+
+	for (const entry of entries) {
+		if (!entry.isDirectory()) continue;
+		if (EXCLUDED_DIRS.has(entry.name) || entry.name.startsWith(".")) continue;
+		subdirs.push(path.join(dir, entry.name));
+	}
+
+	await Promise.all(
+		subdirs.map(async subdir => {
+			if (items.length >= maxFiles) return;
+
+			const candidate = path.join(subdir, "AGENTS.md");
+			if (!found.has(candidate)) {
+				const content = await readFile(candidate);
+				if (content !== null) {
+					found.add(candidate);
+					const fileDir = path.dirname(candidate);
+					const calculatedDepth = calculateDepth(cwd, fileDir, path.sep);
+					items.push({
+						path: candidate,
+						content,
+						level: "project",
+						depth: calculatedDepth,
+						_source: createSourceMeta(PROVIDER_ID, candidate, "project"),
+					});
+				}
+			}
+
+			await collectDescendantAgentsMd(cwd, subdir, depth + 1, maxDepth, maxFiles, found, items);
+		}),
+	);
+}
 
 /**
  * Load standalone AGENTS.md files.
@@ -55,6 +111,20 @@ async function loadAgentsMd(ctx: LoadContext): Promise<LoadResult<ContextFile>> 
 		current = parent;
 		depth++;
 	}
+
+	// Walk down from cwd into subdirectories
+	const found = new Set(items.map(item => item.path));
+	const descendantItems: ContextFile[] = [];
+	await collectDescendantAgentsMd(
+		ctx.cwd,
+		ctx.cwd,
+		1,
+		WALK_DOWN_MAX_DEPTH,
+		WALK_DOWN_MAX_FILES,
+		found,
+		descendantItems,
+	);
+	items.push(...descendantItems);
 
 	return { items, warnings };
 }
