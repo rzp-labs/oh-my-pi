@@ -162,11 +162,13 @@ async function installPythonPackages(
 	pipPath?: string,
 ): Promise<{ success: boolean; usedManagedEnv: boolean }> {
 	if (uvPath) {
-		console.log(chalk.dim(`Installing via uv: ${packages.join(" ")}`));
-		const result = await $`${uvPath} pip install ${packages}`.nothrow();
-		if (result.exitCode === 0) {
-			return { success: true, usedManagedEnv: false };
+		console.log(chalk.dim(`Installing via uv (managed env): ${packages.join(" ")}`));
+		const createEnv = await $`${uvPath} venv ${MANAGED_PYTHON_ENV}`.quiet().nothrow();
+		if (createEnv.exitCode !== 0) {
+			return { success: false, usedManagedEnv: true };
 		}
+		const installInManagedEnv = await $`${uvPath} pip install --python ${MANAGED_PYTHON_ENV} ${packages}`.nothrow();
+		return { success: installInManagedEnv.exitCode === 0, usedManagedEnv: true };
 	}
 
 	if (pipPath) {
@@ -178,15 +180,6 @@ async function installPythonPackages(
 	}
 
 	console.log(chalk.dim(`Falling back to managed virtual environment: ${MANAGED_PYTHON_ENV}`));
-
-	if (uvPath) {
-		const createEnv = await $`${uvPath} venv ${MANAGED_PYTHON_ENV}`.quiet().nothrow();
-		if (createEnv.exitCode !== 0) {
-			return { success: false, usedManagedEnv: true };
-		}
-		const installInManagedEnv = await $`${uvPath} pip install --python ${MANAGED_PYTHON_ENV} ${packages}`.nothrow();
-		return { success: installInManagedEnv.exitCode === 0, usedManagedEnv: true };
-	}
 
 	const createEnv = await $`${pythonPath} -m venv ${MANAGED_PYTHON_ENV}`.quiet().nothrow();
 	if (createEnv.exitCode !== 0) {
@@ -234,6 +227,7 @@ async function handlePythonSetup(flags: { json?: boolean; check?: boolean }): Pr
 
 	if (check.uvPath) {
 		console.log(chalk.dim(`uv: ${check.uvPath}`));
+		console.log(chalk.dim(`Using managed environment: ${check.managedEnvPath}`));
 	} else if (check.pipPath) {
 		console.log(chalk.dim(`pip: ${check.pipPath}`));
 	}
