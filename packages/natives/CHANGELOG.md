@@ -1,6 +1,8 @@
 # Changelog
 
 ## [Unreleased]
+
+## [13.4.0] - 2026-03-01
 ### Breaking Changes
 
 - Changed `AstFindOptions.pattern` to `patterns` (now accepts array of strings instead of single string)
@@ -8,15 +10,15 @@
 
 ### Added
 
-- `astFind` now accepts multiple patterns in a single call; results from all patterns are merged and sorted by file path then position before offset/limit are applied
-- `astReplace` now accepts a `rewrites` map (`Record<string, string>`) and applies all patterns per file in a single pass, compiling them once upfront
-- Result ordering in `astFind` is now deterministic: sorted by path, line, column using `BTreeSet`/`BTreeMap`
+- `astGrep` now accepts multiple patterns in a single call; results from all patterns are merged and sorted by file path then position before offset/limit are applied
+- `astEdit` now accepts a `rewrites` map (`Record<string, string>`) and applies all patterns per file in a single pass, compiling them once upfront
+- Result ordering in `astGrep` is now deterministic: sorted by path, line, column using `BTreeSet`/`BTreeMap`
 
 ## [13.3.8] - 2026-02-28
 ### Added
 
-- Added `astFind()` function for structural code search using AST patterns with support for language-specific matching, selectors, and meta-variable extraction
-- Added `astReplace()` function for structural code rewriting with dry-run mode, replacement limits, and parse error handling
+- Added `astGrep()` function for structural code search using AST patterns with support for language-specific matching, selectors, and meta-variable extraction
+- Added `astEdit()` function for structural code rewriting with dry-run mode, replacement limits, and parse error handling
 - Added `./ast` export path for accessing AST search and rewrite functionality
 
 ## [12.18.0] - 2026-02-21

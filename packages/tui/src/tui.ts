@@ -11,6 +11,11 @@ import { extractSegments, sliceByColumn, sliceWithWidth, visibleWidth } from "./
 
 const SEGMENT_RESET = "\x1b[0m";
 
+type ResizeClearStrategy = "viewport" | "scrollback";
+
+function resolveResizeClearStrategy(value: string | undefined): ResizeClearStrategy {
+	return value?.toLowerCase() === "scrollback" ? "scrollback" : "viewport";
+}
 type InputListenerResult = { consume?: boolean; data?: string } | undefined;
 type InputListener = (data: string) => InputListenerResult;
 
@@ -217,6 +222,7 @@ export class TUI extends Container {
 	#cellSizeQueryPending = false;
 	#showHardwareCursor = process.env.PI_HARDWARE_CURSOR === "1";
 	#clearOnShrink = process.env.PI_CLEAR_ON_SHRINK === "1"; // Clear empty rows when content shrinks (default: off)
+	#resizeClearStrategy = resolveResizeClearStrategy(process.env.PI_TUI_RESIZE_CLEAR_STRATEGY); // Resize full-redraw strategy: viewport(default) or scrollback
 	#maxLinesRendered = 0; // Track terminal's working area (max lines ever rendered)
 	#previousViewportTop = 0; // Track previous viewport top for resize-aware cursor moves
 	#fullRedrawCount = 0;
@@ -885,19 +891,34 @@ export class TUI extends Container {
 		// Helper to clear scrollback and viewport and render all new lines
 		const fullRender = (clear: boolean): void => {
 			this.#fullRedrawCount += 1;
+			const isResizeRedraw = clear && (widthChanged || heightChanged);
+			const shouldRenderViewportOnly =
+				isResizeRedraw && this.#resizeClearStrategy === "viewport" && newLines.length <= this.#previousLines.length;
+			const renderFrom = shouldRenderViewportOnly ? Math.max(0, newLines.length - height) : 0;
+			const renderedLines = renderFrom > 0 ? newLines.slice(renderFrom) : newLines;
 			let buffer = "\x1b[?2026h"; // Begin synchronized output
-			if (clear) buffer += this.#clearScrollbackOnNextFullRender ? "\x1b[3J\x1b[H\x1b[0J" : "\x1b[H\x1b[0J"; // Home + clear from cursor (and optionally scrollback)
-			for (let i = 0; i < newLines.length; i++) {
-				if (i > 0) buffer += "\r\n";
-				buffer += newLines[i];
+			if (clear) {
+				// Keep default home+erase-below semantics for non-resize redraws.
+				// On resize, choose behavior via PI_TUI_RESIZE_CLEAR_STRATEGY.
+				if (this.#clearScrollbackOnNextFullRender) buffer += "\x1b[3J\x1b[2J\x1b[H";
+				else if (isResizeRedraw && this.#resizeClearStrategy === "scrollback") buffer += "\x1b[3J\x1b[2J\x1b[H";
+				else if (isResizeRedraw) buffer += "\x1b[2J\x1b[H";
+				else buffer += "\x1b[H\x1b[0J";
 			}
-			const renderCursorRow = Math.max(0, newLines.length - 1);
-			const cursorUpdate = this.#buildHardwareCursorSequence(cursorPos, newLines.length, renderCursorRow);
+			for (let i = 0; i < renderedLines.length; i++) {
+				if (i > 0) buffer += "\r\n";
+				buffer += renderedLines[i];
+			}
+			const renderCursorRow = Math.max(0, renderedLines.length - 1);
+			const renderCursorPos = cursorPos
+				? { row: Math.max(0, cursorPos.row - renderFrom), col: cursorPos.col }
+				: null;
+			const cursorUpdate = this.#buildHardwareCursorSequence(renderCursorPos, renderedLines.length, renderCursorRow);
 			buffer += cursorUpdate.sequence;
 			buffer += "\x1b[?2026l"; // End synchronized output
 			this.terminal.write(buffer);
-			this.#cursorRow = renderCursorRow;
-			this.#hardwareCursorRow = cursorUpdate.row;
+			this.#cursorRow = Math.max(0, newLines.length - 1);
+			this.#hardwareCursorRow = cursorUpdate.row + renderFrom;
 			// Reset max lines when clearing, otherwise track growth
 			if (clear) {
 				this.#maxLinesRendered = newLines.length;

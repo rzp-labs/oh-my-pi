@@ -1,6 +1,6 @@
 import * as path from "node:path";
 import type { AgentTool, AgentToolContext, AgentToolResult, AgentToolUpdateCallback } from "@oh-my-pi/pi-agent-core";
-import { type AstReplaceChange, astReplace } from "@oh-my-pi/pi-natives";
+import { type AstReplaceChange, astEdit } from "@oh-my-pi/pi-natives";
 import type { Component } from "@oh-my-pi/pi-tui";
 import { Text } from "@oh-my-pi/pi-tui";
 import { untilAborted } from "@oh-my-pi/pi-utils";
@@ -9,34 +9,39 @@ import { renderPromptTemplate } from "../config/prompt-templates";
 import type { RenderResultOptions } from "../extensibility/custom-tools/types";
 import type { Theme } from "../modes/theme/theme";
 import { computeLineHash } from "../patch/hashline";
-import astReplaceDescription from "../prompts/tools/ast-replace.md" with { type: "text" };
+import astEditDescription from "../prompts/tools/ast-edit.md" with { type: "text" };
 import { Ellipsis, Hasher, type RenderCache, renderStatusLine, renderTreeList, truncateToWidth } from "../tui";
 import { resolveFileDisplayMode } from "../utils/file-display-mode";
 import type { ToolSession } from ".";
 import type { OutputMeta } from "./output-meta";
 import { hasGlobPathChars, parseSearchPath, resolveToCwd } from "./path-utils";
-import { formatCount, formatEmptyMessage, formatErrorMessage, PREVIEW_LIMITS } from "./render-utils";
+import {
+	formatCount,
+	formatEmptyMessage,
+	formatErrorMessage,
+	formatParseErrors,
+	PARSE_ERRORS_LIMIT,
+	PREVIEW_LIMITS,
+} from "./render-utils";
 import { ToolError } from "./tool-errors";
 import { toolResult } from "./tool-result";
 
-const astReplaceOpSchema = Type.Object({
+const astEditOpSchema = Type.Object({
 	pat: Type.String({ description: "AST pattern to match" }),
 	out: Type.String({ description: "Replacement template" }),
 });
 
-const astReplaceSchema = Type.Object({
-	ops: Type.Array(astReplaceOpSchema, {
+const astEditSchema = Type.Object({
+	ops: Type.Array(astEditOpSchema, {
 		description: "Rewrite ops as [{ pat, out }]",
 	}),
 	lang: Type.Optional(Type.String({ description: "Language override" })),
 	path: Type.Optional(Type.String({ description: "File, directory, or glob pattern to rewrite (default: cwd)" })),
 	selector: Type.Optional(Type.String({ description: "Optional selector for contextual pattern mode" })),
-	dry_run: Type.Optional(Type.Boolean({ description: "Preview only (default: true)" })),
-	max_replacements: Type.Optional(Type.Number({ description: "Safety cap on total replacements" })),
-	max_files: Type.Optional(Type.Number({ description: "Safety cap on touched files" })),
+	limit: Type.Optional(Type.Number({ description: "Max total replacements" })),
 });
 
-export interface AstReplaceToolDetails {
+export interface AstEditToolDetails {
 	totalReplacements: number;
 	filesTouched: number;
 	filesSearched: number;
@@ -49,24 +54,24 @@ export interface AstReplaceToolDetails {
 	meta?: OutputMeta;
 }
 
-export class AstReplaceTool implements AgentTool<typeof astReplaceSchema, AstReplaceToolDetails> {
-	readonly name = "ast_replace";
-	readonly label = "AST Replace";
+export class AstEditTool implements AgentTool<typeof astEditSchema, AstEditToolDetails> {
+	readonly name = "ast_edit";
+	readonly label = "AST Edit";
 	readonly description: string;
-	readonly parameters = astReplaceSchema;
+	readonly parameters = astEditSchema;
 	readonly strict = true;
-
+	readonly deferrable = true;
 	constructor(private readonly session: ToolSession) {
-		this.description = renderPromptTemplate(astReplaceDescription);
+		this.description = renderPromptTemplate(astEditDescription);
 	}
 
 	async execute(
 		_toolCallId: string,
-		params: Static<typeof astReplaceSchema>,
+		params: Static<typeof astEditSchema>,
 		signal?: AbortSignal,
-		_onUpdate?: AgentToolUpdateCallback<AstReplaceToolDetails>,
+		_onUpdate?: AgentToolUpdateCallback<AstEditToolDetails>,
 		_context?: AgentToolContext,
-	): Promise<AgentToolResult<AstReplaceToolDetails>> {
+	): Promise<AgentToolResult<AstEditToolDetails>> {
 		return untilAborted(signal, async () => {
 			const ops = params.ops.map((entry, index) => {
 				if (entry.pat.length === 0) {
@@ -85,15 +90,11 @@ export class AstReplaceTool implements AgentTool<typeof astReplaceSchema, AstRep
 				seenPatterns.add(pat);
 			}
 			const normalizedRewrites = Object.fromEntries(ops);
-			const maxReplacements =
-				params.max_replacements === undefined ? undefined : Math.floor(params.max_replacements);
+			const maxReplacements = params.limit !== undefined ? Math.floor(params.limit) : undefined;
 			if (maxReplacements !== undefined && (!Number.isFinite(maxReplacements) || maxReplacements < 1)) {
-				throw new ToolError("max_replacements must be a positive number");
+				throw new ToolError("limit must be a positive number");
 			}
-			const maxFiles = params.max_files === undefined ? undefined : Math.floor(params.max_files);
-			if (maxFiles !== undefined && (!Number.isFinite(maxFiles) || maxFiles < 1)) {
-				throw new ToolError("max_files must be a positive number");
-			}
+			const maxFiles = parseInt(process.env.PI_MAX_AST_FILES ?? "", 10) || 1000;
 
 			let searchPath: string | undefined;
 			let globFilter: string | undefined;
@@ -126,13 +127,13 @@ export class AstReplaceTool implements AgentTool<typeof astReplaceSchema, AstRep
 				throw new ToolError(`Path not found: ${resolvedSearchPath}`);
 			}
 
-			const result = await astReplace({
+			const result = await astEdit({
 				rewrites: normalizedRewrites,
 				lang: params.lang?.trim(),
 				path: resolvedSearchPath,
 				glob: globFilter,
 				selector: params.selector?.trim(),
-				dryRun: params.dry_run,
+				dryRun: true,
 				maxReplacements,
 				maxFiles,
 				failOnParseError: false,
@@ -171,7 +172,7 @@ export class AstReplaceTool implements AgentTool<typeof astReplaceSchema, AstRep
 				changesByFile.get(relativePath)!.push(change);
 			}
 
-			const baseDetails: AstReplaceToolDetails = {
+			const baseDetails: AstEditToolDetails = {
 				totalReplacements: result.totalReplacements,
 				filesTouched: result.filesTouched,
 				filesSearched: result.filesSearched,
@@ -185,7 +186,7 @@ export class AstReplaceTool implements AgentTool<typeof astReplaceSchema, AstRep
 
 			if (result.totalReplacements === 0) {
 				const parseMessage = result.parseErrors?.length
-					? `\nParse issues:\n${result.parseErrors.map(err => `- ${err}`).join("\n")}`
+					? `\n${formatParseErrors(result.parseErrors).join("\n")}`
 					: "";
 				return toolResult(baseDetails).text(`No replacements made${parseMessage}`).done();
 			}
@@ -250,20 +251,59 @@ export class AstReplaceTool implements AgentTool<typeof astReplaceSchema, AstRep
 				}
 			}
 
-			const details: AstReplaceToolDetails = {
-				...baseDetails,
-				fileReplacements: fileList.map(filePath => ({
-					path: filePath,
-					count: fileReplacementCounts.get(filePath) ?? 0,
-				})),
-			};
+			const fileReplacements = fileList.map(filePath => ({
+				path: filePath,
+				count: fileReplacementCounts.get(filePath) ?? 0,
+			}));
 			if (result.limitReached) {
-				outputLines.push("", "Safety cap reached; narrow path pattern or increase max_files/max_replacements.");
+				outputLines.push("", "Limit reached; narrow path or increase limit.");
 			}
 			if (result.parseErrors?.length) {
-				outputLines.push("", "Parse issues:", ...result.parseErrors.map(err => `- ${err}`));
+				outputLines.push("", ...formatParseErrors(result.parseErrors));
 			}
 
+			// Register pending action so `resolve` can apply or discard these previewed changes
+			if (!result.applied && result.totalReplacements > 0) {
+				const previewReplacementPlural = result.totalReplacements !== 1 ? "s" : "";
+				const previewFilePlural = result.filesTouched !== 1 ? "s" : "";
+				this.session.pendingActionStore?.push({
+					label: `AST Edit: ${result.totalReplacements} replacement${previewReplacementPlural} in ${result.filesTouched} file${previewFilePlural}`,
+					sourceToolName: this.name,
+					apply: async (_reason: string) => {
+						const applyResult = await astEdit({
+							rewrites: normalizedRewrites,
+							lang: params.lang?.trim(),
+							path: resolvedSearchPath,
+							glob: globFilter,
+							selector: params.selector?.trim(),
+							dryRun: false,
+							maxReplacements,
+							maxFiles,
+							failOnParseError: false,
+						});
+						const appliedDetails: AstEditToolDetails = {
+							totalReplacements: applyResult.totalReplacements,
+							filesTouched: applyResult.filesTouched,
+							filesSearched: applyResult.filesSearched,
+							applied: applyResult.applied,
+							limitReached: applyResult.limitReached,
+							parseErrors: applyResult.parseErrors,
+							scopePath,
+							files: fileList,
+							fileReplacements,
+						};
+						const appliedReplacementPlural = applyResult.totalReplacements !== 1 ? "s" : "";
+						const appliedFilePlural = applyResult.filesTouched !== 1 ? "s" : "";
+						const text = `Applied ${applyResult.totalReplacements} replacement${appliedReplacementPlural} in ${applyResult.filesTouched} file${appliedFilePlural}.`;
+						return toolResult(appliedDetails).text(text).done();
+					},
+				});
+			}
+
+			const details: AstEditToolDetails = {
+				...baseDetails,
+				fileReplacements,
+			};
 			return toolResult(details).text(outputLines.join("\n")).done();
 		});
 	}
@@ -273,40 +313,36 @@ export class AstReplaceTool implements AgentTool<typeof astReplaceSchema, AstRep
 // TUI Renderer
 // =============================================================================
 
-interface AstReplaceRenderArgs {
+interface AstEditRenderArgs {
 	ops?: Array<{ pat?: string; out?: string }>;
 	lang?: string;
 	path?: string;
 	selector?: string;
-	dry_run?: boolean;
-	max_replacements?: number;
-	max_files?: number;
+	limit?: number;
 }
 
 const COLLAPSED_CHANGE_LIMIT = PREVIEW_LIMITS.COLLAPSED_LINES * 2;
 
-export const astReplaceToolRenderer = {
+export const astEditToolRenderer = {
 	inline: true,
-	renderCall(args: AstReplaceRenderArgs, _options: RenderResultOptions, uiTheme: Theme): Component {
+	renderCall(args: AstEditRenderArgs, _options: RenderResultOptions, uiTheme: Theme): Component {
 		const meta: string[] = [];
 		if (args.lang) meta.push(`lang:${args.lang}`);
 		if (args.path) meta.push(`in ${args.path}`);
-		if (args.dry_run !== false) meta.push("dry run");
-		if (args.max_replacements !== undefined) meta.push(`max:${args.max_replacements}`);
-		if (args.max_files !== undefined) meta.push(`max files:${args.max_files}`);
+		if (args.limit !== undefined) meta.push(`limit:${args.limit}`);
 		const rewriteCount = args.ops?.length ?? 0;
 		if (rewriteCount > 1) meta.push(`${rewriteCount} rewrites`);
 
 		const description = rewriteCount === 1 ? args.ops?.[0]?.pat : rewriteCount ? `${rewriteCount} rewrites` : "?";
-		const text = renderStatusLine({ icon: "pending", title: "AST Replace", description, meta }, uiTheme);
+		const text = renderStatusLine({ icon: "pending", title: "AST Edit", description, meta }, uiTheme);
 		return new Text(text, 0, 0);
 	},
 
 	renderResult(
-		result: { content: Array<{ type: string; text?: string }>; details?: AstReplaceToolDetails; isError?: boolean },
+		result: { content: Array<{ type: string; text?: string }>; details?: AstEditToolDetails; isError?: boolean },
 		options: RenderResultOptions,
 		uiTheme: Theme,
-		args?: AstReplaceRenderArgs,
+		args?: AstEditRenderArgs,
 	): Component {
 		const details = result.details;
 
@@ -318,7 +354,6 @@ export const astReplaceToolRenderer = {
 		const totalReplacements = details?.totalReplacements ?? 0;
 		const filesTouched = details?.filesTouched ?? 0;
 		const filesSearched = details?.filesSearched ?? 0;
-		const applied = details?.applied ?? false;
 		const limitReached = details?.limitReached ?? false;
 
 		if (totalReplacements === 0) {
@@ -327,11 +362,15 @@ export const astReplaceToolRenderer = {
 			const meta = ["0 replacements"];
 			if (details?.scopePath) meta.push(`in ${details.scopePath}`);
 			if (filesSearched > 0) meta.push(`searched ${filesSearched}`);
-			const header = renderStatusLine({ icon: "warning", title: "AST Replace", description, meta }, uiTheme);
+			const header = renderStatusLine({ icon: "warning", title: "AST Edit", description, meta }, uiTheme);
 			const lines = [header, formatEmptyMessage("No replacements made", uiTheme)];
 			if (details?.parseErrors?.length) {
-				for (const err of details.parseErrors) {
+				const capped = details.parseErrors.slice(0, PARSE_ERRORS_LIMIT);
+				for (const err of capped) {
 					lines.push(uiTheme.fg("warning", `  - ${err}`));
+				}
+				if (details.parseErrors.length > PARSE_ERRORS_LIMIT) {
+					lines.push(uiTheme.fg("dim", `  … ${details.parseErrors.length - PARSE_ERRORS_LIMIT} more`));
 				}
 			}
 			return new Text(lines.join("\n"), 0, 0);
@@ -344,13 +383,6 @@ export const astReplaceToolRenderer = {
 		if (limitReached) meta.push(uiTheme.fg("warning", "limit reached"));
 		const rewriteCount = args?.ops?.length ?? 0;
 		const description = rewriteCount === 1 ? args?.ops?.[0]?.pat : undefined;
-		const badge = applied
-			? { label: "applied", color: "success" as const }
-			: { label: "dry run", color: "warning" as const };
-		const header = renderStatusLine(
-			{ icon: limitReached ? "warning" : "success", title: "AST Replace", description, badge, meta },
-			uiTheme,
-		);
 
 		const textContent = result.content?.find(c => c.type === "text")?.text ?? "";
 		const rawLines = textContent.split("\n");
@@ -391,15 +423,24 @@ export const astReplaceToolRenderer = {
 			}
 			return count;
 		};
+		const badge = { label: "proposed", color: "warning" as const };
+		const header = renderStatusLine(
+			{ icon: limitReached ? "warning" : "success", title: "AST Edit", description, badge, meta },
+			uiTheme,
+		);
 
 		const extraLines: string[] = [];
 		if (limitReached) {
-			extraLines.push(uiTheme.fg("warning", "safety cap reached; narrow scope or increase limits"));
+			extraLines.push(uiTheme.fg("warning", "limit reached; narrow path or increase limit"));
 		}
 		if (details?.parseErrors?.length) {
-			extraLines.push(uiTheme.fg("warning", `${details.parseErrors.length} parse issue(s)`));
+			const total = details.parseErrors.length;
+			const label =
+				total > PARSE_ERRORS_LIMIT
+					? `${PARSE_ERRORS_LIMIT} / ${total} parse issues`
+					: `${total} parse issue${total !== 1 ? "s" : ""}`;
+			extraLines.push(uiTheme.fg("warning", label));
 		}
-
 		let cached: RenderCache | undefined;
 		return {
 			render(width: number): string[] {

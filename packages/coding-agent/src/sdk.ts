@@ -84,9 +84,11 @@ import {
 	FindTool,
 	GrepTool,
 	getSearchTools,
+	HIDDEN_TOOLS,
 	loadSshTool,
 	PythonTool,
 	ReadTool,
+	ResolveTool,
 	setPreferredImageProvider,
 	setPreferredSearchProvider,
 	type Tool,
@@ -96,6 +98,8 @@ import {
 } from "./tools";
 import { ToolContextStore } from "./tools/context";
 import { getGeminiImageTools } from "./tools/gemini-image";
+import { wrapToolWithMetaNotice } from "./tools/output-meta";
+import { PendingActionStore } from "./tools/pending-action";
 import { EventBus } from "./utils/event-bus";
 
 // Types
@@ -216,6 +220,7 @@ export {
 	BashTool,
 	// Tool classes and factories
 	BUILTIN_TOOLS,
+	HIDDEN_TOOLS,
 	createTools,
 	EditTool,
 	FindTool,
@@ -223,6 +228,7 @@ export {
 	loadSshTool,
 	PythonTool,
 	ReadTool,
+	ResolveTool,
 	WriteTool,
 	type ToolSession,
 };
@@ -770,6 +776,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			})
 		: undefined;
 
+	const pendingActionStore = new PendingActionStore();
 	const toolSession: ToolSession = {
 		cwd,
 		hasUI: options.hasUI ?? false,
@@ -810,6 +817,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		authStorage,
 		modelRegistry,
 		asyncJobManager,
+		pendingActionStore,
 	};
 
 	// Initialize internal URL router for internal protocols (agent://, artifact://, memory://, skill://, rule://, local://)
@@ -918,6 +926,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		[],
 		cwd,
 		builtInToolNames,
+		pendingActionStore,
 	);
 	for (const { path, error } of discoveredCustomTools.errors) {
 		logger.error("Custom tool load failed", { path, error });
@@ -1101,6 +1110,16 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 	}
 	if (model?.provider === "cursor") {
 		toolRegistry.delete("edit");
+	}
+
+	const hasDeferrableTools = Array.from(toolRegistry.values()).some(tool => tool.deferrable === true);
+	if (!hasDeferrableTools) {
+		toolRegistry.delete("resolve");
+	} else if (!toolRegistry.has("resolve")) {
+		const resolveTool = await logger.timeAsync("createTools:resolve:session", HIDDEN_TOOLS.resolve, toolSession);
+		if (resolveTool) {
+			toolRegistry.set(resolveTool.name, wrapToolWithMetaNotice(resolveTool) as AgentTool);
+		}
 	}
 
 	let cursorEventEmitter: ((event: AgentEvent) => void) | undefined;
@@ -1301,6 +1320,12 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			return result;
 		},
 		intentTracing: !!intentField,
+		getToolChoice: () => {
+			if (pendingActionStore.hasPending) {
+				return { type: "function", name: "resolve" };
+			}
+			return undefined;
+		},
 	});
 	cursorEventEmitter = event => agent.emitExternalEvent(event);
 
@@ -1337,6 +1362,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		forceCopilotAgentInitiator,
 		obfuscator,
 		asyncJobManager,
+		pendingActionStore,
 	});
 
 	if (model?.api === "openai-codex-responses") {
