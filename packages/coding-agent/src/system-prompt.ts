@@ -603,6 +603,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		hasMCPDiscoveryServers: mcpDiscoveryServerSummaries.length > 0,
 		mcpDiscoveryServerSummaries,
 		eagerTasks,
+		hasMCPTools: toolNames.some(name => name.startsWith("mcp_")),
 	};
 	return renderPromptTemplate(resolvedCustomPrompt ? customSystemPromptTemplate : systemPromptTemplate, data);
 }
