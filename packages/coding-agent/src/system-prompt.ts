@@ -508,6 +508,7 @@ export async function buildSystemPrompt(options: BuildSystemPromptOptions = {}):
 		intentTracing: !!intentField,
 		intentField: intentField ?? "",
 		eagerTasks,
+		hasMCPTools: toolNames.some(name => name.startsWith("mcp_")),
 	};
 	return renderPromptTemplate(resolvedCustomPrompt ? customSystemPromptTemplate : systemPromptTemplate, data);
 }

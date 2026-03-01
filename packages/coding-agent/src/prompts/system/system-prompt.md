@@ -197,6 +197,12 @@ Commands **MUST** match the host shell. linux/bash, macos/zsh: Unix. windows/cmd
 Remote filesystems: `~/.omp/remote/<hostname>/`. Windows paths need colons: `C:/Users/…`
 {{/has}}
 
+{{#if hasMCPTools}}
+### MCP tools: prefer resource reuse
+
+When MCP tools expose parameters to reuse existing resources (e.g., `reuseExistingTerminalWindow` on terminal commands), you **SHOULD** set them to `true` to avoid accumulating open tabs/windows across a session. Only create new instances when isolation is specifically needed.
+{{/if}}
+
 {{#ifAny (includes tools "grep") (includes tools "find")}}
 ### Search before you read
 
