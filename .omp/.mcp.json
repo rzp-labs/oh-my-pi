@@ -1,0 +1,14 @@
+{
+  "disabledServers": [
+    "circleci-mcp-server",
+    "deepwiki",
+    "devin",
+    "firecrawl",
+    "linear",
+    "morph",
+    "nia",
+    "nx-mcp",
+    "playwright",
+    "sonarqube"
+  ]
+}
