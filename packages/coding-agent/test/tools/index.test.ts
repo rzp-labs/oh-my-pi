@@ -132,7 +132,7 @@ describe("createTools", () => {
 
 	it("excludes render_mermaid tool by default", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).not.toContain("render_mermaid");
@@ -144,7 +144,7 @@ describe("createTools", () => {
 				"renderMermaid.enabled": true,
 			}),
 		});
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).toContain("render_mermaid");
