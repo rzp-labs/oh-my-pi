@@ -10,8 +10,8 @@ upstream:  A - B - C - D - E - F - G   (tracks can1357/oh-my-pi exactly)
 main:                                [patch 1] - [patch 2] - [patch 3]
 ```
 
-`main` always contains our patches stacked on top of `upstream`. Syncing
-advances the `upstream` branch, then rebases `main` onto the new tip. Patches
+`main` always contains our patches stacked on top of `upstream/main`. Syncing
+fetches the latest upstream, then rebases `main` onto the new tip. Patches
 replay one at a time; conflicts surface per-patch, not as a tangled merge.
 
 ## Arguments
@@ -71,18 +71,10 @@ Stash any uncommitted changes:
 git stash
 ```
 
-Fast-forward the `upstream` tracking branch to the new tip:
+Fetch latest upstream commits:
 
 ```bash
-git checkout upstream
-git merge --ff-only upstream/main
-git checkout main
-```
-
-Rebase our patches onto the new upstream tip:
-
-```bash
-git rebase upstream main
+git fetch upstream
 ```
 
 ### 4. Resolve conflicts
