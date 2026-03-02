@@ -1,22 +1,34 @@
 # Sync Upstream
 
-Merge upstream changes from `can1357/oh-my-pi` into this fork, resolve conflicts, verify, and push.
+Rebase local patches onto the latest `can1357/oh-my-pi` upstream.
+
+## Branch model
+
+```
+upstream:  A - B - C - D - E - F - G   (tracks can1357/oh-my-pi exactly)
+                                    \
+main:                                [patch 1] - [patch 2] - [patch 3]
+```
+
+`main` always contains our patches stacked on top of `upstream`. Syncing
+advances the `upstream` branch, then rebases `main` onto the new tip. Patches
+replay one at a time; conflicts surface per-patch, not as a tangled merge.
 
 ## Arguments
 
-- `$ARGUMENTS`: Optional flags. `--dry-run` to report divergence without merging.
+- `$ARGUMENTS`: Optional flags. `--dry-run` to report divergence without rebasing.
 
 ## Steps
 
 ### 1. Setup upstream remote
 
-Ensure the `upstream` remote exists. If not, add it:
+Ensure the `upstream` remote exists:
 
 ```bash
 git remote add upstream https://github.com/can1357/oh-my-pi.git
 ```
 
-Fetch upstream main:
+Fetch latest:
 
 ```bash
 git fetch upstream main
@@ -27,65 +39,81 @@ git fetch upstream main
 Count commits ahead/behind:
 
 ```bash
-git rev-list --count main..upstream/main    # behind
-git rev-list --count upstream/main..main    # ahead (local patches)
+git rev-list --count main..upstream/main    # behind (incoming upstream)
+git rev-list --count upstream/main..main    # ahead (our local patches)
 ```
 
-Present a structured report to the user:
+Present a structured report:
 
-**Local patches (ahead of upstream):** List each with short SHA, subject line, and files touched.
+**Local patches (ahead of upstream):** List each with short SHA, subject line,
+and files touched. These are the commits that will be replayed during rebase.
 
-**Upstream incoming (behind):** List all commits grouped by package/area (e.g., `packages/ai`, `packages/coding-agent`, `packages/tui`). For each group, show commit count and the subjects. Highlight any commits that touch the same files as local patches — these are conflict risks.
+**Upstream incoming (behind):** List commits grouped by package/area. Highlight
+any that touch the same files as local patches — these are conflict risks.
 
-**Conflict risk assessment:** Run `git merge-tree $(git merge-base HEAD upstream/main) HEAD upstream/main` or a dry merge to identify files that will conflict. Report them explicitly.
+**Conflict risk assessment:** For each local patch that touches the same file as
+an incoming upstream commit, flag it. These patches will likely need manual
+resolution during the rebase.
 
 **Stop here and ask the user for approval.** Present options:
-- Proceed with full merge
-- Cherry-pick specific commits only
+- Proceed with full rebase
 - Abort (just wanted the report)
 
 Do NOT continue to step 3 without explicit approval.
 
 If `--dry-run` was passed, stop here regardless of response.
 
-### 3. Stash and merge
+### 3. Stash, advance upstream, rebase
 
-Only after approval in step 2.
-
-If there are uncommitted changes, stash them:
+Stash any uncommitted changes:
 
 ```bash
 git stash
 ```
 
+Fast-forward the `upstream` tracking branch to the new tip:
+
 ```bash
-git merge upstream/main
+git checkout upstream
+git merge --ff-only upstream/main
+git checkout main
+```
+
+Rebase our patches onto the new upstream tip:
+
+```bash
+git rebase upstream main
 ```
 
 ### 4. Resolve conflicts
 
-If there are conflicts, present each conflicted file to the user with:
-- The file path
-- Both sides of the conflict (ours vs theirs)
-- A recommended resolution with rationale
+If a patch conflicts, rebase pauses at that commit. For each conflict:
 
-**Ask the user to approve each resolution before applying it.** Do not batch-resolve without review.
+- Show the user the patch subject and files affected
+- Show both sides of the conflict
+- Recommend a resolution with rationale
+
+**Ask the user to approve each resolution before applying it.**
 
 Standing rules:
-- **NEVER modify upstream CHANGELOG.md** — fork-local changes belong in `FORK_CHANGELOG.md` (gitignored). If the conflict is in a CHANGELOG, accept upstream's version entirely (`git checkout --theirs <file>`).
-- For code conflicts: prefer upstream's structure when the local change can be cleanly reapplied on top.
+- **NEVER modify upstream CHANGELOG.md** — accept upstream's version entirely
+  (`git checkout --theirs <file>`) and carry fork-local changes in
+  `packages/fork/CHANGELOG.md` instead.
+- For code conflicts: apply the patch's intent onto upstream's new structure.
+  The goal is to preserve what the patch was doing, not preserve its exact lines.
 
-After all conflicts are resolved and approved: `git add` the resolved files and `git merge --continue`.
+After resolving each conflicted file: `git add <file>` then `git rebase --continue`.
+
+If a patch becomes a no-op after resolution (upstream already incorporated the
+same change), drop it: `git rebase --skip`.
 
 ### 5. Pop stash
 
-If work was stashed in step 3, pop it:
+If work was stashed in step 3:
 
 ```bash
 git stash pop
 ```
-
-If the stash pop has conflicts, resolve them. Our working changes should apply cleanly on top of the merged state since they target different code than upstream typically changes.
 
 ### 6. Install and verify
 
@@ -95,15 +123,16 @@ bun build:native
 bun check:ts
 ```
 
-If `crates/` or `Cargo.lock` changed in the merge, the native addon must be rebuilt before
-tests run — a stale binary will fail at runtime with a confusing "missing export" error.
-`bun build:native` is fast when nothing changed (Cargo skips the build in ~1s), so run it
-unconditionally.
+If `crates/` or `Cargo.lock` changed in the incoming commits, the native addon
+must be rebuilt before tests run — a stale binary will fail at runtime with a
+confusing "missing export" error. `bun build:native` is fast when nothing changed
+(Cargo skips in ~1s), so run it unconditionally.
 
-If type errors or lint failures appear, fix them before proceeding.
+Fix any type errors or lint failures before proceeding.
+
 ### 7. Run tests for changed areas
 
-Run tests that cover files touched by the merge. At minimum:
+Run tests that cover files touched by the incoming commits. At minimum:
 
 ```bash
 bun test test/async-job-manager.test.ts    # if async/job-manager.ts changed
@@ -111,24 +140,32 @@ bun test test/async-job-manager.test.ts    # if async/job-manager.ts changed
 
 Do not run the full test suite unless asked.
 
-### 8. Update FORK_CHANGELOG.md
+### 8. Update packages/fork/CHANGELOG.md
 
-If there are local patches ahead of upstream (from step 2), ensure they are documented in `FORK_CHANGELOG.md` at the repo root. Each entry should include:
+Ensure all local patches are documented in `packages/fork/CHANGELOG.md`. Each
+entry should include:
 
 - The short SHA
 - The conventional commit subject
 - A brief description of what it changes
 
-This file is gitignored and exists only for local traceability.
+If any patch was dropped during rebase (upstream absorbed it), remove its entry
+from the changelog and note it as upstreamed.
 
 ### 9. Push
 
 ```bash
-git push --no-verify origin main
+git push --force-with-lease --no-verify origin main
 ```
 
-The `--no-verify` bypasses the LFS pre-push hook (git-lfs is not installed in this environment).
+`--force-with-lease` is required because rebase rewrites history. It fails safely
+if the remote has commits you haven't seen — preventing accidental overwrites.
+
+`--no-verify` bypasses the LFS pre-push hook (git-lfs is not installed here).
 
 ### 10. Suggest upstreaming
 
-After syncing, review the local patches (ahead commits). For each one, assess whether it should be submitted as a PR to `can1357/oh-my-pi`. Patches that fix genuine bugs (not fork-specific customizations) should be upstreamed to eliminate divergence. Report your assessment.
+After syncing, review the local patches. For each one, assess whether it should
+be submitted as a PR to `can1357/oh-my-pi`. Patches that fix genuine bugs (not
+fork-specific customizations) should be upstreamed to eliminate divergence.
+Report your assessment.
