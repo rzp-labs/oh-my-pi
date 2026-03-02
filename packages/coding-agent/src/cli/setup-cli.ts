@@ -7,6 +7,7 @@ import * as path from "node:path";
 import { APP_NAME, getPythonEnvDir } from "@oh-my-pi/pi-utils";
 import { $ } from "bun";
 import chalk from "chalk";
+import { resolvePythonRuntime } from "../ipy/runtime";
 import { theme } from "../modes/theme/theme";
 
 export type SetupComponent = "python" | "stt";
@@ -90,65 +91,34 @@ async function checkPythonSetup(): Promise<PythonCheckResult> {
 		managedEnvPath: MANAGED_PYTHON_ENV,
 	};
 
-	const systemPythonPath = Bun.which("python") ?? Bun.which("python3");
-	const managedPath = managedPythonPath();
-	const hasManagedEnv = await Bun.file(managedPath).exists();
-
 	result.uvPath = Bun.which("uv") ?? undefined;
 	result.pipPath = Bun.which("pip3") ?? Bun.which("pip") ?? undefined;
 
-	const candidates = [systemPythonPath, hasManagedEnv ? managedPath : undefined].filter(
-		(candidate): candidate is string => !!candidate,
-	);
-	if (candidates.length === 0) {
+	// Use the same resolution as the runtime so this check reflects exactly
+	// which Python the gateway will use. Managed venv is preferred over
+	// project-local venvs; falls through to system Python if managed absent.
+	const runtime = resolvePythonRuntime(process.cwd(), {}, { preferManaged: true });
+
+	// No Python at all — report unavailable so the caller shows a clear error.
+	if (!runtime.venvPath && !Bun.which("python") && !Bun.which("python3")) {
 		return result;
 	}
 
-	result.pythonPath = systemPythonPath ?? managedPath;
-	let bestMatch = {
-		pythonPath: candidates[0],
-		missingPackages: [...PYTHON_PACKAGES],
-		installedPackages: [] as string[],
-		usingManagedEnv: candidates[0] === managedPath,
-	};
+	result.pythonPath = runtime.pythonPath;
+	result.usingManagedEnv = runtime.venvPath === MANAGED_PYTHON_ENV;
 
-	for (const pythonPath of candidates) {
-		const installedPackages: string[] = [];
-		const missingPackages: string[] = [];
-		for (const pkg of PYTHON_PACKAGES) {
-			const moduleName = pkg === "jupyter_kernel_gateway" ? "kernel_gateway" : pkg;
-			const script = `import importlib.util; raise SystemExit(0 if importlib.util.find_spec('${moduleName}') else 1)`;
-			const check = await $`${pythonPath} -c ${script}`.quiet().nothrow();
-			if (check.exitCode === 0) {
-				installedPackages.push(pkg);
-			} else {
-				missingPackages.push(pkg);
-			}
-		}
-
-		if (missingPackages.length < bestMatch.missingPackages.length) {
-			bestMatch = {
-				pythonPath,
-				missingPackages,
-				installedPackages,
-				usingManagedEnv: pythonPath === managedPath,
-			};
-		}
-
-		if (missingPackages.length === 0) {
-			result.available = true;
-			result.pythonPath = pythonPath;
-			result.missingPackages = missingPackages;
-			result.installedPackages = installedPackages;
-			result.usingManagedEnv = pythonPath === managedPath;
-			return result;
+	for (const pkg of PYTHON_PACKAGES) {
+		const moduleName = pkg === "jupyter_kernel_gateway" ? "kernel_gateway" : pkg;
+		const script = `import importlib.util; raise SystemExit(0 if importlib.util.find_spec('${moduleName}') else 1)`;
+		const check = await $`${runtime.pythonPath} -c ${script}`.quiet().nothrow().env(runtime.env);
+		if (check.exitCode === 0) {
+			result.installedPackages.push(pkg);
+		} else {
+			result.missingPackages.push(pkg);
 		}
 	}
 
-	result.pythonPath = bestMatch.pythonPath;
-	result.missingPackages = bestMatch.missingPackages;
-	result.installedPackages = bestMatch.installedPackages;
-	result.usingManagedEnv = bestMatch.usingManagedEnv;
+	result.available = result.missingPackages.length === 0;
 	return result;
 }
 
