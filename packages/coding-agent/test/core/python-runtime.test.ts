@@ -5,11 +5,15 @@ import * as path from "node:path";
 import { resolvePythonRuntime } from "@oh-my-pi/pi-coding-agent/ipy/runtime";
 import * as piUtils from "@oh-my-pi/pi-utils";
 
+/** Platform-aware venv layout constants. */
+const VENV_BIN = process.platform === "win32" ? "Scripts" : "bin";
+const VENV_PYTHON = process.platform === "win32" ? "python.exe" : "python";
+
 /** Create a minimal stub venv: just the bin/python file that satisfies fs.existsSync. */
 function createStubVenv(venvPath: string): void {
-	const binDir = path.join(venvPath, "bin");
+	const binDir = path.join(venvPath, VENV_BIN);
 	fs.mkdirSync(binDir, { recursive: true });
-	fs.writeFileSync(path.join(binDir, "python"), "");
+	fs.writeFileSync(path.join(binDir, VENV_PYTHON), "");
 }
 
 /** Stub managed venv dir AND intercept getPythonEnvDir to point at it. */
@@ -47,7 +51,7 @@ describe("resolvePythonRuntime", () => {
 			const runtime = resolvePythonRuntime(cwd, {});
 
 			expect(runtime.venvPath).toBe(projectVenv);
-			expect(runtime.pythonPath).toBe(path.join(projectVenv, "bin", "python"));
+			expect(runtime.pythonPath).toBe(path.join(projectVenv, VENV_BIN, VENV_PYTHON));
 			expect(runtime.env.VIRTUAL_ENV).toBe(projectVenv);
 		});
 
@@ -71,13 +75,13 @@ describe("resolvePythonRuntime", () => {
 			const runtime = resolvePythonRuntime(cwd, {});
 
 			expect(runtime.venvPath).toBe(managedDir);
-			expect(runtime.pythonPath).toBe(path.join(managedDir, "bin", "python"));
+			expect(runtime.pythonPath).toBe(path.join(managedDir, VENV_BIN, VENV_PYTHON));
 		});
 
 		it("skips project .venv whose Python binary is missing", () => {
 			const cwd = path.join(tmpDir, "project");
 			// Directory structure exists but no bin/python inside
-			fs.mkdirSync(path.join(cwd, ".venv", "bin"), { recursive: true });
+			fs.mkdirSync(path.join(cwd, ".venv", VENV_BIN), { recursive: true });
 			const managedDir = path.join(tmpDir, "managed");
 			stubManagedVenv(managedDir);
 
@@ -111,7 +115,7 @@ describe("resolvePythonRuntime", () => {
 			const runtime = resolvePythonRuntime(cwd, {}, { preferManaged: true });
 
 			expect(runtime.venvPath).toBe(managedDir);
-			expect(runtime.pythonPath).toBe(path.join(managedDir, "bin", "python"));
+			expect(runtime.pythonPath).toBe(path.join(managedDir, VENV_BIN, VENV_PYTHON));
 		});
 
 		it("does not fall back to project .venv when managed is absent", () => {
@@ -124,7 +128,7 @@ describe("resolvePythonRuntime", () => {
 
 			// Project venv must be ignored; system Python is the only fallback
 			expect(runtime.venvPath).toBeUndefined();
-			expect(runtime.pythonPath).not.toBe(path.join(projectVenv, "bin", "python"));
+			expect(runtime.pythonPath).not.toBe(path.join(projectVenv, VENV_BIN, VENV_PYTHON));
 		});
 
 		it("falls back to explicit VIRTUAL_ENV when managed is absent", () => {
@@ -160,7 +164,7 @@ describe("resolvePythonRuntime", () => {
 
 			const runtime = resolvePythonRuntime(tmpDir, { PATH: "/usr/bin:/bin" }, { preferManaged: true });
 
-			const expectedBin = path.join(managedDir, "bin");
+			const expectedBin = path.join(managedDir, VENV_BIN);
 			expect(runtime.env.PATH).toBe(`${expectedBin}${path.delimiter}/usr/bin:/bin`);
 		});
 
