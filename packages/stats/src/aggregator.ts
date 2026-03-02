@@ -42,7 +42,6 @@ async function syncSessionFile(sessionFile: string): Promise<number> {
 	// Parse file from last offset
 	const fromOffset = stored?.offset ?? 0;
 	const { stats, newOffset } = await parseSessionFile(sessionFile, fromOffset);
-
 	if (stats.length > 0) {
 		insertMessageStats(stats);
 	}
@@ -65,7 +64,13 @@ export async function syncAllSessions(): Promise<{ processed: number; files: num
 	let filesProcessed = 0;
 
 	for (const file of files) {
-		const count = await syncSessionFile(file);
+		let count = 0;
+		try {
+			count = await syncSessionFile(file);
+		} catch (err) {
+			console.warn(`[stats] Failed to sync ${file}: ${err instanceof Error ? err.message : err}`);
+			continue;
+		}
 		if (count > 0) {
 			totalProcessed += count;
 			filesProcessed++;
