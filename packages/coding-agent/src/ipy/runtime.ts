@@ -175,15 +175,32 @@ function resolveWindowlessPython(pythonPath: string): string {
 /**
  * Resolve Python runtime including executable path, environment, and venv detection.
  */
-export function resolvePythonRuntime(cwd: string, baseEnv: Record<string, string | undefined>): PythonRuntime {
+export function resolvePythonRuntime(
+	cwd: string,
+	baseEnv: Record<string, string | undefined>,
+	options?: { preferManaged?: boolean },
+): PythonRuntime {
 	const env = { ...baseEnv };
-	const venvPath = env.VIRTUAL_ENV ?? resolveVenvPath(cwd);
+	const preferManaged = options?.preferManaged ?? false;
 
-	if (venvPath) {
-		env.VIRTUAL_ENV = venvPath;
+	// Build ordered venv candidates based on context.
+	// Shared/durable contexts (e.g. shared gateway) prefer the managed venv
+	// over project-local venvs which are transient and project-specific.
+	const candidates: string[] = [];
+	if (preferManaged) {
+		candidates.push(resolveManagedPythonCandidate().venvPath);
+		if (env.VIRTUAL_ENV) candidates.push(env.VIRTUAL_ENV);
+	} else {
+		const projectVenv = env.VIRTUAL_ENV ?? resolveVenvPath(cwd);
+		if (projectVenv) candidates.push(projectVenv);
+		candidates.push(resolveManagedPythonCandidate().venvPath);
+	}
+
+	for (const venvPath of candidates) {
 		const binDir = process.platform === "win32" ? path.join(venvPath, "Scripts") : path.join(venvPath, "bin");
 		const pythonCandidate = path.join(binDir, process.platform === "win32" ? "python.exe" : "python");
 		if (fs.existsSync(pythonCandidate)) {
+			env.VIRTUAL_ENV = venvPath;
 			const pathKey = resolvePathKey(env);
 			const currentPath = env[pathKey];
 			env[pathKey] = currentPath ? `${binDir}${path.delimiter}${currentPath}` : binDir;
@@ -195,6 +212,7 @@ export function resolvePythonRuntime(cwd: string, baseEnv: Record<string, string
 		}
 	}
 
+<<<<<<< HEAD
 	const managed = resolveManagedPythonCandidate();
 	if (fs.existsSync(managed.pythonPath)) {
 		env.VIRTUAL_ENV = managed.venvPath;
