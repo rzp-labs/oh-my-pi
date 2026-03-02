@@ -58,16 +58,15 @@ See `.omp/commands/sync-upstream.md` for the full procedure.
 
 ## New Machine Setup
 
-One-time steps on any machine that clones this fork:
+After cloning, run the setup script from the repo root:
 
 ```bash
-git remote add upstream https://github.com/can1357/oh-my-pi.git
-git fetch upstream
+packages/fork/setup.sh
 ```
 
-No local `upstream` branch needed — `upstream/main` (the remote tracking ref) is
-used directly in rebase commands and stays current with `git fetch upstream`.
-
+This adds the `upstream` remote, fetches it, and configures git-flow-next
+(requires `brew install gittower/tap/git-flow-next`). No local `upstream`
+branch is created — `upstream/main` (the remote tracking ref) is used directly.
 ## Dev Environment
 
 `bun install:dev` runs `bun link` for `coding-agent` and `ai` packages, which
