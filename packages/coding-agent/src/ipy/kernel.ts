@@ -119,7 +119,7 @@ export async function checkPythonKernelAvailability(cwd: string): Promise<Python
 		const settings = await Settings.init();
 		const { env } = settings.getShellConfig();
 		const baseEnv = filterEnv(env);
-		const runtime = resolvePythonRuntime(cwd, baseEnv);
+		const runtime = resolvePythonRuntime(cwd, baseEnv, { preferManaged: true });
 		const checkScript =
 			"import importlib.util,sys;sys.exit(0 if importlib.util.find_spec('kernel_gateway') and importlib.util.find_spec('ipykernel') else 1)";
 		const result = await $`${runtime.pythonPath} -c ${checkScript}`.quiet().nothrow().cwd(cwd).env(runtime.env);
@@ -129,8 +129,7 @@ export async function checkPythonKernelAvailability(cwd: string): Promise<Python
 		return {
 			ok: false,
 			pythonPath: runtime.pythonPath,
-			reason:
-				"kernel_gateway (jupyter-kernel-gateway) or ipykernel not installed. Run: python -m pip install jupyter_kernel_gateway ipykernel",
+			reason: "kernel_gateway or ipykernel not installed. Run: omp setup python",
 		};
 	} catch (err: unknown) {
 		return { ok: false, reason: err instanceof Error ? err.message : String(err) };
