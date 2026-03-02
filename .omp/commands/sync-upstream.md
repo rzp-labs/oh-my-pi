@@ -90,12 +90,17 @@ If the stash pop has conflicts, resolve them. Our working changes should apply c
 ### 6. Install and verify
 
 ```bash
-bun install
+bun install:dev
+bun build:native
 bun check:ts
 ```
 
-If type errors or lint failures appear, fix them before proceeding.
+If `crates/` or `Cargo.lock` changed in the merge, the native addon must be rebuilt before
+tests run — a stale binary will fail at runtime with a confusing "missing export" error.
+`bun build:native` is fast when nothing changed (Cargo skips the build in ~1s), so run it
+unconditionally.
 
+If type errors or lint failures appear, fix them before proceeding.
 ### 7. Run tests for changed areas
 
 Run tests that cover files touched by the merge. At minimum:
