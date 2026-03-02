@@ -84,7 +84,7 @@ export async function createTestSession(options: TestSessionOptions = {}): Promi
 		getSessionSpawns: () => "*",
 		settings: Settings.isolated(options.settingsOverrides),
 	};
-	const tools = await createTools(toolSession);
+	const { tools } = await createTools(toolSession);
 
 	const model = getBundledModel("anthropic", "claude-sonnet-4-5")!;
 	const agent = new Agent({

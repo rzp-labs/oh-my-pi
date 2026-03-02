@@ -261,14 +261,23 @@ function getPythonModeFromEnv(): PythonToolMode | null {
 	}
 }
 
+/** A notice to surface in the UI after startup (non-blocking). */
+export interface StartupNotice {
+	kind: "warn" | "error" | "info";
+	message: string;
+}
 /**
  * Create tools from BUILTIN_TOOLS registry.
  */
-export async function createTools(session: ToolSession, toolNames?: string[]): Promise<Tool[]> {
+export async function createTools(
+	session: ToolSession,
+	toolNames?: string[],
+): Promise<{ tools: Tool[]; notices: StartupNotice[] }> {
 	const includeSubmitResult = session.requireSubmitResultTool === true;
 	const enableLsp = session.enableLsp ?? true;
 	const requestedTools =
 		toolNames && toolNames.length > 0 ? [...new Set(toolNames.map(name => name.toLowerCase()))] : undefined;
+	const notices: StartupNotice[] = [];
 	if (requestedTools && !requestedTools.includes("exit_plan_mode")) {
 		requestedTools.push("exit_plan_mode");
 	}
@@ -291,6 +300,10 @@ export async function createTools(session: ToolSession, toolNames?: string[]): P
 		if (!availability.ok) {
 			logger.warn("Python kernel unavailable, falling back to bash", {
 				reason: availability.reason,
+			});
+			notices.push({
+				kind: "warn",
+				message: `Python tools disabled: ${availability.reason ?? "kernel environment not set up. Run: omp setup python"}`,
 			});
 		} else if (!skipPythonWarm && getPreludeDocs().length === 0) {
 			const sessionFile = session.getSessionFile?.() ?? undefined;
@@ -391,14 +404,14 @@ export async function createTools(session: ToolSession, toolNames?: string[]): P
 	const tools = baseResults.filter((r): r is Tool => r !== null);
 	const hasDeferrableTools = tools.some(tool => tool.deferrable === true);
 	if (!hasDeferrableTools) {
-		return tools;
+		return { tools, notices };
 	}
 	if (tools.some(tool => tool.name === "resolve")) {
-		return tools;
+		return { tools, notices };
 	}
 	const resolveTool = await logger.timeAsync("createTools:resolve", HIDDEN_TOOLS.resolve, session);
 	if (resolveTool) {
 		tools.push(wrapToolWithMetaNotice(resolveTool));
 	}
-	return tools;
+	return { tools, notices };
 }

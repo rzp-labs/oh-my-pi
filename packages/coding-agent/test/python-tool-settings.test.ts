@@ -39,7 +39,7 @@ describe("python tool settings", () => {
 	it("exposes python tool when kernel is available", async () => {
 		vi.spyOn(pythonKernel, "checkPythonKernelAvailability").mockResolvedValue({ ok: true });
 		const sessionFile = path.join(testDir, "session.jsonl");
-		const tools = await createTools(createSession(testDir, sessionFile), ["python"]);
+		const { tools } = await createTools(createSession(testDir, sessionFile), ["python"]);
 
 		expect(tools.map(tool => tool.name).sort()).toEqual(["exit_plan_mode", "python"]);
 	});
@@ -50,7 +50,7 @@ describe("python tool settings", () => {
 			reason: "missing",
 		});
 		const sessionFile = path.join(testDir, "session.jsonl");
-		const tools = await createTools(createSession(testDir, sessionFile), ["python"]);
+		const { tools } = await createTools(createSession(testDir, sessionFile), ["python"]);
 
 		expect(tools.map(tool => tool.name).sort()).toEqual(["bash", "exit_plan_mode"]);
 	});

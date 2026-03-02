@@ -49,7 +49,7 @@ describe("createTools", () => {
 
 	it("creates all builtin tools by default", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		// Core tools should always be present
@@ -76,7 +76,7 @@ describe("createTools", () => {
 				"python.kernelMode": "session",
 			}),
 		});
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).toContain("bash");
@@ -90,7 +90,7 @@ describe("createTools", () => {
 				"python.kernelMode": "session",
 			}),
 		});
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).toContain("bash");
@@ -99,7 +99,7 @@ describe("createTools", () => {
 
 	it("excludes lsp tool when session disables LSP", async () => {
 		const session = createTestSession({ enableLsp: false });
-		const tools = await createTools(session, ["read", "lsp", "write"]);
+		const { tools } = await createTools(session, ["read", "lsp", "write"]);
 		const names = tools.map(t => t.name);
 
 		expect(names).toEqual(["read", "write", "exit_plan_mode"]);
@@ -107,7 +107,7 @@ describe("createTools", () => {
 
 	it("excludes lsp tool when disabled", async () => {
 		const session = createTestSession({ enableLsp: false });
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).not.toContain("lsp");
@@ -115,7 +115,7 @@ describe("createTools", () => {
 
 	it("respects requested tool subset", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session, ["read", "write"]);
+		const { tools } = await createTools(session, ["read", "write"]);
 		const names = tools.map(t => t.name);
 
 		expect(names).toEqual(["read", "write", "exit_plan_mode"]);
@@ -131,7 +131,7 @@ describe("createTools", () => {
 
 	it("includes hidden tools when explicitly requested", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session, ["report_finding"]);
+		const { tools } = await createTools(session, ["report_finding"]);
 		const names = tools.map(t => t.name);
 
 		expect(names).toEqual(["report_finding", "exit_plan_mode"]);
@@ -139,7 +139,7 @@ describe("createTools", () => {
 
 	it("includes submit_result tool when required", async () => {
 		const session = createTestSession({ requireSubmitResultTool: true });
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).toContain("submit_result");
@@ -147,7 +147,7 @@ describe("createTools", () => {
 
 	it("excludes ask tool when hasUI is false", async () => {
 		const session = createTestSession({ hasUI: false });
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).not.toContain("ask");
@@ -155,7 +155,7 @@ describe("createTools", () => {
 
 	it("includes ask tool when hasUI is true", async () => {
 		const session = createTestSession({ hasUI: true });
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).toContain("ask");

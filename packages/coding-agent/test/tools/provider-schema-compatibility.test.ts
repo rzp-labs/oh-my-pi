@@ -37,7 +37,8 @@ async function collectToolSchemas(): Promise<ToolSchemaEntry[]> {
 	const session = createTestSession();
 	const byToolName = new Map<string, Record<string, unknown>>();
 
-	for (const tool of await createTools(session)) {
+	const { tools } = await createTools(session);
+	for (const tool of tools) {
 		const schema = asSchemaObject(tool.parameters);
 		if (!schema) {
 			continue;
