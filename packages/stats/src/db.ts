@@ -216,7 +216,7 @@ export function getOverallStats(): AggregatedStats {
 	const stmt = db.prepare(`
 		SELECT
 			COUNT(*) as total_requests,
-			SUM(CASE WHEN stop_reason = 'error' THEN 1 ELSE 0 END) as failed_requests,
+			SUM(CASE WHEN error_message IS NOT NULL OR stop_reason = 'error' THEN 1 ELSE 0 END) as failed_requests,
 			SUM(input_tokens) as total_input_tokens,
 			SUM(output_tokens) as total_output_tokens,
 			SUM(cache_read_tokens) as total_cache_read_tokens,
@@ -246,7 +246,7 @@ export function getStatsByModel(): ModelStats[] {
 			model,
 			provider,
 			COUNT(*) as total_requests,
-			SUM(CASE WHEN stop_reason = 'error' THEN 1 ELSE 0 END) as failed_requests,
+			SUM(CASE WHEN error_message IS NOT NULL OR stop_reason = 'error' THEN 1 ELSE 0 END) as failed_requests,
 			SUM(input_tokens) as total_input_tokens,
 			SUM(output_tokens) as total_output_tokens,
 			SUM(cache_read_tokens) as total_cache_read_tokens,
@@ -281,7 +281,7 @@ export function getStatsByFolder(): FolderStats[] {
 		SELECT
 			folder,
 			COUNT(*) as total_requests,
-			SUM(CASE WHEN stop_reason = 'error' THEN 1 ELSE 0 END) as failed_requests,
+			SUM(CASE WHEN error_message IS NOT NULL OR stop_reason = 'error' THEN 1 ELSE 0 END) as failed_requests,
 			SUM(input_tokens) as total_input_tokens,
 			SUM(output_tokens) as total_output_tokens,
 			SUM(cache_read_tokens) as total_cache_read_tokens,
@@ -317,7 +317,7 @@ export function getTimeSeries(hours = 24): TimeSeriesPoint[] {
 		SELECT
 			(timestamp / 3600000) * 3600000 as bucket,
 			COUNT(*) as requests,
-			SUM(CASE WHEN stop_reason = 'error' THEN 1 ELSE 0 END) as errors,
+			SUM(CASE WHEN error_message IS NOT NULL OR stop_reason = 'error' THEN 1 ELSE 0 END) as errors,
 			SUM(total_tokens) as tokens,
 			SUM(cost_total) as cost
 		FROM messages
