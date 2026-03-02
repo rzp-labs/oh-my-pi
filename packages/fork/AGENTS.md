@@ -21,12 +21,32 @@ main:                        [patch 1] - [patch 2] - [patch 3]
 regular commits. When upstream advances, we rebase `main` onto the new tip —
 patches replay one at a time, conflicts surface per-patch.
 
-### Feature work
+### Feature and fix work
 
-For new fork-local features: work on `feature/<name>`, fix on `fix/<name>`.
-Push to `origin/feature/<name>`, open a PR targeting `main`, squash-merge when
-approved. The squashed commit becomes a new patch in the stack and will replay
-cleanly on future rebases. This is a regular fast-forward push — no force needed.
+Always use git-flow commands — they enforce squash-merge onto `main` and rebase
+when updating from `main`, keeping the patch stack linear.
+
+```bash
+# Start
+git flow feature start <name>   # new feature
+git flow fix start <name>        # bug fix
+
+# During work — keep branch current with main
+git flow update                  # rebases branch from main
+
+# When done
+git flow publish                 # push branch to origin
+git flow finish                  # squash-merges into main, deletes branch
+```
+
+After `finish`, push main:
+
+```bash
+git push --no-verify origin main
+```
+
+The squashed commit becomes a new patch in the stack and will replay cleanly
+on future upstream rebases. This is a regular fast-forward push — no force needed.
 
 ### What 'sync' means
 
