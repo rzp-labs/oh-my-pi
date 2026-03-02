@@ -235,7 +235,7 @@ describe("sanitizeSchemaForGoogle", () => {
 describe("tool schema validation (post-sanitization)", () => {
 	it("all builtin tool schemas are valid after sanitization", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 
 		const allViolations: { tool: string; violations: SchemaViolation[] }[] = [];
 
@@ -269,7 +269,7 @@ describe("tool schema validation (post-sanitization)", () => {
 
 	it("no sanitized schema contains $schema declaration", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 
 		for (const tool of tools) {
 			const schema = tool.parameters;
@@ -283,7 +283,7 @@ describe("tool schema validation (post-sanitization)", () => {
 
 	it("no sanitized schema contains $ref or $defs", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 
 		for (const tool of tools) {
 			const schema = tool.parameters;
@@ -297,7 +297,7 @@ describe("tool schema validation (post-sanitization)", () => {
 
 	it("no sanitized schema contains Draft 2020-12 specific features", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 
 		const draft2020Features = [
 			"prefixItems",
@@ -319,7 +319,7 @@ describe("tool schema validation (post-sanitization)", () => {
 
 	it("sanitization removes const (converts to enum)", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 
 		for (const tool of tools) {
 			const schema = tool.parameters;
@@ -333,7 +333,7 @@ describe("tool schema validation (post-sanitization)", () => {
 
 	it("no sanitized schema contains examples field", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 
 		for (const tool of tools) {
 			const schema = tool.parameters;
@@ -368,7 +368,7 @@ describe("tool schema validation (post-sanitization)", () => {
 
 	it("logs warnings for potentially problematic features (non-blocking)", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 
 		const warnings: { tool: string; violations: SchemaViolation[] }[] = [];
 

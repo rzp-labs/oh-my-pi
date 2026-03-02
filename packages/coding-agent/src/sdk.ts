@@ -93,6 +93,7 @@ import {
 	PythonTool,
 	ReadTool,
 	ResolveTool,
+	type StartupNotice,
 	setPreferredImageProvider,
 	setPreferredSearchProvider,
 	type Tool,
@@ -205,6 +206,8 @@ export interface CreateAgentSessionResult {
 	modelFallbackMessage?: string;
 	/** LSP servers that were warmed up at startup */
 	lspServers?: Array<{ name: string; status: "ready" | "error"; fileTypes: string[]; error?: string }>;
+	/** Startup notices from tool initialization (e.g. Python unavailable) */
+	notices?: StartupNotice[];
 }
 
 // Re-exports
@@ -911,7 +914,9 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 	);
 
 	// Create built-in tools (already wrapped with meta notice formatting)
-	const builtinTools = await logger.timeAsync("createAllTools", () => createTools(toolSession, options.toolNames));
+	const { tools: builtinTools, notices: toolNotices } = await logger.timeAsync("createAllTools", () =>
+		createTools(toolSession, options.toolNames),
+	);
 
 	// Discover MCP tools from .mcp.json files
 	let mcpManager: MCPManager | undefined;
@@ -1533,5 +1538,6 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		mcpManager,
 		modelFallbackMessage,
 		lspServers,
+		notices: toolNotices,
 	};
 }

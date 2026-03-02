@@ -61,16 +61,13 @@ async function readPipedInput(): Promise<string | undefined> {
 	}
 }
 
-export interface InteractiveModeNotify {
-	kind: "warn" | "error" | "info";
-	message: string;
-}
+import type { StartupNotice } from "./tools";
 
 async function runInteractiveMode(
 	session: AgentSession,
 	version: string,
 	changelogMarkdown: string | undefined,
-	notifs: (InteractiveModeNotify | null)[],
+	notifs: StartupNotice[],
 	versionCheckPromise: Promise<string | undefined>,
 	initialMessages: string[],
 	setExtensionUIContext: (uiContext: ExtensionUIContext, hasUI: boolean) => void,
@@ -494,7 +491,7 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 	const parsedArgs = parsed;
 	await logger.timeAsync("maybeAutoChdir", () => maybeAutoChdir(parsedArgs));
 
-	const notifs: (InteractiveModeNotify | null)[] = [];
+	const notifs: StartupNotice[] = [];
 
 	// Create AuthStorage and ModelRegistry upfront
 	const { authStorage, modelRegistry } = await logger.timeAsync("discoverModels", async () => {
@@ -636,7 +633,7 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 		}
 	}
 
-	const { session, setToolUIContext, modelFallbackMessage, lspServers, mcpManager } = await logger.timeAsync(
+	const { session, setToolUIContext, modelFallbackMessage, lspServers, mcpManager, notices } = await logger.timeAsync(
 		"createAgentSession",
 		() => createAgentSession(sessionOptions),
 	);
@@ -646,6 +643,9 @@ export async function runRootCommand(parsed: Args, rawArgs: string[]): Promise<v
 
 	if (modelFallbackMessage) {
 		notifs.push({ kind: "warn", message: modelFallbackMessage });
+	}
+	if (notices) {
+		notifs.push(...notices);
 	}
 
 	const modelRegistryError = modelRegistry.getError();

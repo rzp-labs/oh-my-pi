@@ -56,7 +56,7 @@ describe.skipIf(!HAS_ANTIGRAVITY_AUTH)("Compaction with thinking models (Antigra
 			getSessionSpawns: () => "*",
 			settings: Settings.isolated(),
 		};
-		const tools = await createTools(toolSession);
+		const { tools } = await createTools(toolSession);
 
 		const model = getBundledModel("google-antigravity", modelId);
 		if (!model) {
@@ -164,7 +164,7 @@ describe.skipIf(!HAS_ANTHROPIC_AUTH)("Compaction with thinking models (Anthropic
 			getSessionSpawns: () => "*",
 			settings: Settings.isolated(),
 		};
-		const tools = await createTools(toolSession);
+		const { tools } = await createTools(toolSession);
 
 		const agent = new Agent({
 			getApiKey: () => e2eApiKey("ANTHROPIC_API_KEY"),

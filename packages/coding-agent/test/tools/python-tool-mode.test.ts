@@ -22,7 +22,7 @@ describe("createTools python fallback", () => {
 		const previous = Bun.env.PI_PYTHON_SKIP_CHECK;
 		Bun.env.PI_PYTHON_SKIP_CHECK = "1";
 		const session = createSession();
-		const tools = await createTools(session, ["python"]);
+		const { tools } = await createTools(session, ["python"]);
 		const names = tools.map(tool => tool.name).sort();
 
 		expect(names).toEqual(["bash", "exit_plan_mode"]);

@@ -35,7 +35,7 @@ describe("createTools python fallback", () => {
 			}),
 		});
 
-		const tools = await createTools(session, ["python"]);
+		const { tools } = await createTools(session, ["python"]);
 		const names = tools.map(tool => tool.name).sort();
 
 		expect(names).toEqual(["bash", "exit_plan_mode"]);
@@ -55,7 +55,7 @@ describe("createTools python fallback", () => {
 			}),
 		});
 
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(tool => tool.name);
 
 		expect(names).toContain("bash");
