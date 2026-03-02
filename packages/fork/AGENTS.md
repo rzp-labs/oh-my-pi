@@ -30,11 +30,23 @@ cleanly on future rebases. This is a regular fast-forward push — no force need
 
 ### What 'sync' means
 
-1. Advance `upstream` branch: `git fetch upstream && git merge --ff-only upstream/main`
-2. Rebase patches: `git rebase upstream main`
+1. Fetch upstream: `git fetch upstream`
+2. Rebase patches: `git rebase upstream/main main`
 3. Force-push (required after rebase, admin only): `git push --force-with-lease origin main`
 
 See `.omp/commands/sync-upstream.md` for the full procedure.
+
+## New Machine Setup
+
+One-time steps on any machine that clones this fork:
+
+```bash
+git remote add upstream https://github.com/can1357/oh-my-pi.git
+git fetch upstream
+```
+
+No local `upstream` branch needed — `upstream/main` (the remote tracking ref) is
+used directly in rebase commands and stays current with `git fetch upstream`.
 
 ## Dev Environment
 
