@@ -7,7 +7,7 @@ import * as path from "node:path";
 import { APP_NAME, getPythonEnvDir } from "@oh-my-pi/pi-utils";
 import { $ } from "bun";
 import chalk from "chalk";
-import { resolvePythonRuntime } from "../ipy/runtime";
+import { type PythonRuntime, resolvePythonRuntime } from "../ipy/runtime";
 import { theme } from "../modes/theme/theme";
 
 export type SetupComponent = "python" | "stt";
@@ -97,10 +97,12 @@ async function checkPythonSetup(): Promise<PythonCheckResult> {
 	// Use the same resolution as the runtime so this check reflects exactly
 	// which Python the gateway will use. Managed venv is preferred over
 	// project-local venvs; falls through to system Python if managed absent.
-	const runtime = resolvePythonRuntime(process.cwd(), {}, { preferManaged: true });
-
-	// No Python at all — report unavailable so the caller shows a clear error.
-	if (!runtime.venvPath && !Bun.which("python") && !Bun.which("python3")) {
+	// Wrap in try-catch: resolvePythonRuntime throws when no Python is found,
+	// which is the structured "unavailable" signal we want to return cleanly.
+	let runtime: PythonRuntime;
+	try {
+		runtime = resolvePythonRuntime(process.cwd(), {}, { preferManaged: true });
+	} catch {
 		return result;
 	}
 
