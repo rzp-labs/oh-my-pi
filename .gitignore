@@ -46,7 +46,6 @@ packages/ai/test/.temp-images/
 .worktrees/
 compaction-results/
 changes/
-FORK_CHANGELOG.md
 __pycache__/
 
 # Scratch files
