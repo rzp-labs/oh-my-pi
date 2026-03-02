@@ -467,7 +467,7 @@ export function getRecentErrors(limit = 100): MessageStats[] {
 	if (!db) return [];
 	const stmt = db.prepare(`
 		SELECT * FROM messages 
-		WHERE stop_reason = 'error'
+		WHERE error_message IS NOT NULL OR stop_reason = 'error'
 		ORDER BY timestamp DESC 
 		LIMIT ?
 	`);
