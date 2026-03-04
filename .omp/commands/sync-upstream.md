@@ -71,10 +71,11 @@ Stash any uncommitted changes:
 git stash
 ```
 
-Fetch latest upstream commits:
+Fetch and rebase onto the new upstream tip:
 
 ```bash
 git fetch upstream
+git rebase upstream/main
 ```
 
 ### 4. Resolve conflicts
