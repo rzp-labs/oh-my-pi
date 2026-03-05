@@ -23,7 +23,7 @@ describe("ast_grep parse errors", () => {
 			const filePath = path.join(tempDir, "broken.ts");
 			await Bun.write(filePath, "export function broken( { return 1; }");
 
-			const tools = await createTools(createTestSession(tempDir));
+			const { tools } = await createTools(createTestSession(tempDir));
 			const tool = tools.find(entry => entry.name === "ast_grep");
 			expect(tool).toBeDefined();
 
