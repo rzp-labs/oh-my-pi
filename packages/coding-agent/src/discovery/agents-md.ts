@@ -1,11 +1,12 @@
 /**
  * AGENTS.md Provider
- *
  * Discovers standalone AGENTS.md files by walking up from cwd to the repo root.
- * Also loads .omp/AGENTS.md from the repo root as a pinned global context file —
- * .omp/ is fork-local by convention so this survives upstream rebases without conflict.
+ * Also loads explicitly pinned AGENTS.md files listed in .omp/settings.json under
+ * `pinnedContextFiles` (paths relative to repo root). Files under .omp/ are excluded
+ * from pins — they are already loaded by the native OMP provider.
  */
 import * as path from "node:path";
+import { tryParseJson } from "@oh-my-pi/pi-utils";
 import { registerProvider } from "../capability";
 import { type ContextFile, contextFileCapability } from "../capability/context-file";
 import { readFile } from "../capability/fs";
@@ -55,21 +56,41 @@ async function loadAgentsMd(ctx: LoadContext): Promise<LoadResult<ContextFile>> 
 		current = parent;
 	}
 
-	// Load .omp/AGENTS.md from the repo root as a pinned global context file.
-	// Force depth to -1 so it always uses the path-based dedup key: .omp/ is not
-	// in the cwd ancestry chain and must not compete with ancestor files for a depth slot.
+	// Load explicitly pinned AGENTS.md files from .omp/settings.json
 	if (ctx.repoRoot) {
-		const ompPath = path.join(ctx.repoRoot, ".omp", "AGENTS.md");
-		if (!items.some(item => item.path === ompPath)) {
-			const content = await readFile(ompPath);
-			if (content !== null) {
-				items.push({
-					path: ompPath,
-					content,
-					level: "project",
-					depth: -1,
-					_source: createSourceMeta(PROVIDER_ID, ompPath, "project"),
-				});
+		const ompDir = path.join(ctx.repoRoot, ".omp");
+		const settingsPath = path.join(ompDir, "settings.json");
+		const settingsContent = await readFile(settingsPath);
+		if (settingsContent) {
+			const settings = tryParseJson<{ pinnedContextFiles?: unknown }>(settingsContent);
+			const pins = settings?.pinnedContextFiles;
+			if (Array.isArray(pins)) {
+				for (const entry of pins) {
+					if (typeof entry !== "string") {
+						warnings.push(`pinnedContextFiles: skipping non-string entry: ${String(entry)}`);
+						continue;
+					}
+					const abs = path.resolve(ctx.repoRoot, entry);
+					// Skip files under .omp/ — loaded by the native OMP provider at higher priority
+					if (abs.startsWith(ompDir + path.sep) || abs === ompDir) {
+						warnings.push(`pinnedContextFiles: skipping ${entry} (loaded by native OMP provider)`);
+						continue;
+					}
+					// Skip if already discovered by the walk-up
+					if (items.some(item => item.path === abs)) continue;
+					const content = await readFile(abs);
+					if (content === null) {
+						warnings.push(`pinnedContextFiles: file not found: ${entry}`);
+						continue;
+					}
+					items.push({
+						path: abs,
+						content,
+						level: "project",
+						depth: -1,
+						_source: createSourceMeta(PROVIDER_ID, abs, "project"),
+					});
+				}
 			}
 		}
 	}

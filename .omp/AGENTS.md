@@ -2,7 +2,7 @@
 
 This directory contains fork-specific configuration and documentation that
 must not be upstreamed. It is invisible to upstream merges — upstream has no
-`packages/fork/` directory, so syncing never touches these files.
+`.omp/` directory, so rebasing never produces conflicts in these files.
 
 ## Branching
 
@@ -67,6 +67,7 @@ packages/fork/setup.sh
 This adds the `upstream` remote, fetches it, and configures git-flow-next
 (requires `brew install gittower/tap/git-flow-next`). No local `upstream`
 branch is created — `upstream/main` (the remote tracking ref) is used directly.
+
 ## Dev Environment
 
 `bun install:dev` runs `bun link` for `coding-agent` and `ai` packages, which
