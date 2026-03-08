@@ -5,17 +5,15 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ---
 
-## Synced through upstream `13.9.2+5` (`0a5744dd`) (2026-03-06)
+## Synced through upstream `13.9.7` (`092681ba`) (2026-03-07)
 
 ---
 
 ## Active Local Patches
 
-### fix(session): default thinkingLevel to "off" in buildSessionContext (`2dedc985`)
+~~### fix(session): default thinkingLevel to "off" in buildSessionContext (`2dedc985`)~~
 
-`buildSessionContext` returned `thinkingLevel: undefined` when no `thinking_level_change` entry
-existed in the session. Correct semantic default is `"off"` — no prior setting means thinking
-is disabled. Fixes upstream test expectation in `compaction.test.ts` and `build-context.test.ts`.
+**Upstreamed** — absorbed by `b6a51462` (feat(ai): added incremental history for remote compact). Patch dropped during 13.9.7 rebase.
 
 
 ### fix(setup-cli): guard resolvePythonRuntime throw on fresh machines (`3b4e566d`)
@@ -116,8 +114,10 @@ upstream registry on every push.
 Fork-local MCP server configuration (exclusions for unused servers) and context window
 safeguards in session messages.
 
-### fix(test): update tests for createTools return shape (`5a30cf2c`)
+### fix(test): update tests for createTools return shape (`5a30cf2c`, `36b0cdc9`)
 
 Updated test files to destructure `{ tools }` from `createTools()` after upstream changed
 the return type from `Tool[]` to `{ tools: Tool[]; notices: StartupNotice[] }`.
-Also fixed `ast-grep.test.ts` which was missed in the original patch.
+During 13.9.7 sync: upstream AST tool refactor (`0433900c`) and lowercase normalization (`1acd2816`)
+left three more bare `createTools()` calls in `ast-edit.test.ts`, `ast-grep.test.ts`, and
+`index.test.ts`. Fixed all three during rebase.
