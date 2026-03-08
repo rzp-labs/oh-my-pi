@@ -60,7 +60,7 @@ describe("ast_grep parse errors", () => {
 			await Bun.write(path.join(sourceDir, "ignore.js"), "const providerOptions = {};\n");
 			await Bun.write(path.join(tempDir, "outside.ts"), "const providerOptions = {};\n");
 
-			const tools = await createTools(createTestSession(tempDir));
+			const { tools } = await createTools(createTestSession(tempDir));
 			const tool = tools.find(entry => entry.name === "ast_grep");
 			expect(tool).toBeDefined();
 

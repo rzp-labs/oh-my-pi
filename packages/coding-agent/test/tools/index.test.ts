@@ -123,7 +123,7 @@ describe("createTools", () => {
 
 	it("lowercases requested tool subset", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session, ["Read", "Write"]);
+		const { tools } = await createTools(session, ["Read", "Write"]);
 		const names = tools.map(t => t.name);
 
 		expect(names).toEqual(["read", "write", "exit_plan_mode"]);

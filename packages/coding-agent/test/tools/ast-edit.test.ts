@@ -129,7 +129,7 @@ describe("ast_edit tool schema", () => {
 			await Bun.write(path.join(tempDir, "outside.ts"), "legacyWrap(outsideValue, outsideArg)\n");
 			const pendingActionStore = new PendingActionStore();
 
-			const tools = await createTools(createTestSession(tempDir, { pendingActionStore }));
+			const { tools } = await createTools(createTestSession(tempDir, { pendingActionStore }));
 			const tool = tools.find(entry => entry.name === "ast_edit");
 			expect(tool).toBeDefined();
 
