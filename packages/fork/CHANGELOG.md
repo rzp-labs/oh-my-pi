@@ -11,6 +11,14 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ## Active Local Patches
 
+### feat(lsp): add ty language server to defaults (`f2e7e98a`)
+
+Added `ty` to `defaults.json` so auto-detect can discover it. Entry specifies
+`ty server` as the LSP command, file types `.py`/`.pyi`, and root markers
+`pyproject.toml`/`ty.toml`. Projects using `ty` and not pyright will now get
+the correct language server without needing a config override.
+
+
 ~~### fix(session): default thinkingLevel to "off" in buildSessionContext (`2dedc985`)~~
 
 **Upstreamed** — absorbed by `b6a51462` (feat(ai): added incremental history for remote compact). Patch dropped during 13.9.7 rebase.

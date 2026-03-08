@@ -220,7 +220,7 @@ describe("createTools", () => {
 
 	it("excludes inspect_image tool by default", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).not.toContain("inspect_image");
@@ -232,7 +232,7 @@ describe("createTools", () => {
 				"inspect_image.enabled": true,
 			}),
 		});
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).toContain("inspect_image");

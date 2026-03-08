@@ -170,6 +170,13 @@
 			}
 		}
 	},
+	"ty": {
+		"command": "ty",
+		"args": ["server"],
+		"fileTypes": [".py", ".pyi"],
+		"rootMarkers": ["pyproject.toml", "ty.toml"]
+	},
+
 	"pylsp": {
 		"command": "pylsp",
 		"args": [],
