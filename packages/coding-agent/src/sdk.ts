@@ -113,6 +113,7 @@ import {
 	ResolveTool,
 	renderSearchToolBm25Description,
 	type StartupNotice,
+	setPreferredCodeSearchProvider,
 	setPreferredImageProvider,
 	setPreferredSearchProvider,
 	type Tool,

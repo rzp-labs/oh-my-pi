@@ -316,57 +316,45 @@ function getConfigPaths(cwd: string): string[] {
  * ```
  */
 export function loadConfig(cwd: string): LspConfig {
-	let mergedServers = coerceServerConfigs(DEFAULTS);
-
+	// Collect overrides from all config files (lowest → highest priority).
+	// Overrides are patches applied on top of auto-detect; they never replace it.
 	const configPaths = getConfigPaths(cwd).reverse();
-	let hasOverrides = false;
-
+	let serverOverrides: Record<string, Partial<ServerConfig>> = {};
 	let idleTimeoutMs: number | undefined;
+
 	for (const configPath of configPaths) {
 		const parsed = readConfigFile(configPath);
 		if (!parsed) continue;
-		const hasServerOverrides = Object.keys(parsed.servers).length > 0;
-		if (hasServerOverrides) {
-			hasOverrides = true;
-			mergedServers = mergeServers(mergedServers, parsed.servers);
+		if (Object.keys(parsed.servers).length > 0) {
+			serverOverrides = { ...serverOverrides, ...parsed.servers };
 		}
 		if (parsed.idleTimeoutMs !== undefined) {
 			idleTimeoutMs = parsed.idleTimeoutMs;
 		}
 	}
 
-	if (!hasOverrides) {
-		// Auto-detect: find servers based on project markers AND available binaries
-		const detected: Record<string, ServerConfig> = {};
-		const defaultsWithRuntime = applyRuntimeDefaults(mergedServers);
+	// Always auto-detect: root markers gate which servers are eligible.
+	// Overrides are applied on top — disabled:true suppresses a server,
+	// other fields (args, fileTypes, etc.) refine its config.
+	const defaults = applyRuntimeDefaults(coerceServerConfigs(DEFAULTS));
+	const detected: Record<string, ServerConfig> = {};
 
-		for (const [name, config] of Object.entries(defaultsWithRuntime)) {
-			// Check if project has root markers for this language
-			if (!hasRootMarkers(cwd, config.rootMarkers)) continue;
-
-			// Check if the language server binary is available (local or $PATH)
-			const resolved = resolveCommand(config.command, cwd);
-			if (!resolved) continue;
-
-			detected[name] = { ...config, resolvedCommand: resolved };
-		}
-
-		return { servers: detected, idleTimeoutMs };
-	}
-
-	// Merge overrides with defaults and filter to available servers
-	const mergedWithRuntime = applyRuntimeDefaults(mergedServers);
-	const available: Record<string, ServerConfig> = {};
-
-	for (const [name, config] of Object.entries(mergedWithRuntime)) {
-		if (config.disabled) continue;
+	for (const [name, config] of Object.entries(defaults)) {
 		if (!hasRootMarkers(cwd, config.rootMarkers)) continue;
 		const resolved = resolveCommand(config.command, cwd);
 		if (!resolved) continue;
-		available[name] = { ...config, resolvedCommand: resolved };
+		detected[name] = { ...config, resolvedCommand: resolved };
 	}
 
-	return { servers: available, idleTimeoutMs };
+	// Apply overrides: merge config patches, then honour disabled flag.
+	const merged = mergeServers(detected, serverOverrides);
+	const servers: Record<string, ServerConfig> = {};
+	for (const [name, config] of Object.entries(merged)) {
+		if (config.disabled) continue;
+		servers[name] = config;
+	}
+
+	return { servers, idleTimeoutMs };
 }
 
 // =============================================================================
