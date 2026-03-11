@@ -5,7 +5,7 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ---
 
-## Synced through upstream `13.10.1` (`c8d345e0`) (2026-03-10)
+## Synced through upstream `e936f285` — 20 commits (2026-03-11)
 
 ---
 
@@ -122,9 +122,11 @@ upstream registry on every push.
 Fork-local MCP server configuration (exclusions for unused servers) and context window
 safeguards in session messages.
 
-### fix(test): update tests for createTools return shape (`209869ae`, `340ce013`, `dc064094`)
+### fix(test): update tests for createTools return shape (`209869ae`, `340ce013`, `dc064094`, `d7fa060c`)
 
 Updated test files to destructure `{ tools }` from `createTools()` after upstream changed
 	the return type from `Tool[]` to `{ tools: Tool[]; notices: StartupNotice[] }`.
 During 13.9.15 sync: two new upstream tests (`inspect_image` include/exclude) in `index.test.ts`
 also used the old bare array API. Fixed during rebase (amended into tip commit).
+During 13.10.1+20 sync: upstream `09c16f22` added `search-path-lists.test.ts` with the same
+old bare-array assumption. Fixed `d7fa060c` in post-rebase cleanup.
