@@ -69,7 +69,7 @@ describe("search tool path lists", () => {
 	});
 
 	it("grep accepts space-separated path lists", async () => {
-		const tools = await createTools(createTestSession(tempDir));
+		const { tools } = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "grep");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing grep tool");
@@ -91,7 +91,7 @@ describe("search tool path lists", () => {
 	});
 
 	it("grep keeps a single path that contains spaces", async () => {
-		const tools = await createTools(createTestSession(tempDir));
+		const { tools } = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "grep");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing grep tool");
@@ -150,7 +150,7 @@ describe("search tool path lists", () => {
 	});
 
 	it("ast_grep accepts comma-separated path lists", async () => {
-		const tools = await createTools(createTestSession(tempDir));
+		const { tools } = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "ast_grep");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing ast_grep tool");
@@ -176,7 +176,7 @@ describe("search tool path lists", () => {
 
 	it("ast_edit applies across a space-separated path list", async () => {
 		const pendingActionStore = new PendingActionStore();
-		const tools = await createTools(createTestSession(tempDir, { pendingActionStore }));
+		const { tools } = await createTools(createTestSession(tempDir, { pendingActionStore }));
 		const tool = tools.find(entry => entry.name === "ast_edit");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing ast_edit tool");
@@ -216,7 +216,7 @@ describe("search tool path lists", () => {
 	});
 
 	it("find accepts comma-separated path lists", async () => {
-		const tools = await createTools(createTestSession(tempDir));
+		const { tools } = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "find");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing find tool");
@@ -256,7 +256,7 @@ describe("search tool path lists", () => {
 	});
 
 	it("grep accepts bare space-separated directory names (no trailing slash)", async () => {
-		const tools = await createTools(createTestSession(tempDir));
+		const { tools } = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "grep");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing grep tool");
