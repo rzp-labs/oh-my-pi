@@ -5,40 +5,46 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ---
 
-## Synced through upstream `e936f285` — 20 commits (2026-03-11)
+## Synced through upstream `8e61ab4f` — 23 commits (2026-03-13)
 
 ---
 
 ## Active Local Patches
 
-### feat(lsp): add ty language server to defaults (`dc064094`)
+### fix(lsp): always auto-detect servers; apply overrides on top (`38d5bdae`)
+
+Always auto-detect servers regardless of whether config overrides are present.
+Overrides are applied on top — `disabled:true` suppresses a server, other fields refine it.
+Previously the two paths (no-override vs override) diverged; now unified into one always-auto-detect flow.
+Subsumes upstream `733e1623` (root marker check in override path) — conflict resolved during 13.11.1 rebase.
+
+### feat(lsp): add ty language server to defaults (`6334e9e2`)
 
 Added `ty` to `defaults.json` so auto-detect can discover it. Entry specifies
 `ty server` as the LSP command, file types `.py`/`.pyi`, and root markers
 `pyproject.toml`/`ty.toml`. Projects using `ty` and not pyright will now get
 the correct language server without needing a config override.
 
-
 ~~### fix(session): default thinkingLevel to "off" in buildSessionContext (`2dedc985`)~~
 
 **Upstreamed** — absorbed by `b6a51462` (feat(ai): added incremental history for remote compact). Patch dropped during 13.9.7 rebase.
 
 
-### fix(setup-cli): guard resolvePythonRuntime throw on fresh machines (`4929a35c`)
+### fix(setup-cli): guard resolvePythonRuntime throw on fresh machines (`c05f89b8`)
 
 On a machine with no managed env and no Python on PATH, `resolvePythonRuntime` throws before
 `checkPythonSetup` can reach its early-return guard, crashing `omp setup python` instead of
 returning a structured unavailable result. Wrapped in try-catch. Also made `python-runtime`
 tests platform-aware (VENV_BIN/VENV_PYTHON constants).
 
-### feat(tools): surface startup notice when Python tools unavailable (`270eadf7`)
+### feat(tools): surface startup notice when Python tools unavailable (`871e1c78`)
 
 Added `StartupNotice` interface; changed `createTools` return type to
 `Promise<{ tools: Tool[]; notices: StartupNotice[] }>`. When Python tools are configured but
 the preflight fails, a warn notice is pushed and surfaced in the TUI before interactive mode
 starts. Wired through `CreateAgentSessionResult` and `main.ts` notification loop.
 
-### fix(ipy): prefer managed venv in gateway and preflight checks (`14cae069`)
+### fix(ipy): prefer managed venv in gateway and preflight checks (`ecbdbeef`)
 
 Root cause of WebSocket connection errors in `sync-upstream`: shared gateway was binding to
 project-local `.venv` instead of `~/.omp/python-env`. Added `{ preferManaged }` option to
@@ -46,24 +52,24 @@ project-local `.venv` instead of `~/.omp/python-env`. Added `{ preferManaged }` 
 `{ preferManaged: true }`. Unified `checkPythonSetup` to use the same resolution order.
 17 unit tests for `resolvePythonRuntime`.
 
-### feat(coding-agent): instruct model to reuse MCP terminal windows (`e314596d`)
+### feat(coding-agent): instruct model to reuse MCP terminal windows (`d3d6ebdf`)
 
 System prompt addition: instructs the model to use `reuseExistingTerminalWindow: true` on
 JetBrains terminal tool calls to avoid accumulating open tabs.
 
-### fix(await): suppress/pre-acknowledge deliveries to prevent system-notice spam (`16ded338`, `f680a71c`)
+### fix(await): suppress/pre-acknowledge deliveries to prevent system-notice spam (`a67c4318`, `370412b9`)
 
 Two-part fix for stale system-notice spam when awaiting batch async tasks.
 1. Pre-suppress watched job IDs via `acknowledgeDeliveries()` before blocking.
 2. Replace `Promise.race` with `Promise.allSettled` so all jobs settle before returning.
 
-### fix(extensions): load SSH hosts in extension control center (`de5b3541`)
+### fix(extensions): load SSH hosts in extension control center (`289e6a75`)
 
 `loadAllExtensions()` never called `loadCapability("ssh")`. SSH Config tab appeared with
 count=0 and was skipped. Added ssh-host kind to `ExtensionKind` + loading block +
 display name mapping.
 
-### fix(discovery): load all AGENTS.md files instead of collapsing to one (`7afd4576`)
+### fix(discovery): load all AGENTS.md files instead of collapsing to one (`91ca9966`)
 
 Three bugs: (1) dedup key was `file.level` so all project-level files collapsed to one entry;
 (2) agents-md provider only walked UP (ancestors), not down into subdirectories; (3) extension
@@ -75,13 +81,13 @@ replaced downward walk with explicit `pinnedContextFiles` loading from `.omp/set
 upstream). Key function: `d < 0 ? path:${file.path} : project:${d}` (infrastructure preserved,
 downward walk superseded by pinning).
 
-### fix(task): batch async task delivery and bridge subprocess intent to TUI (`80c45be4`)
+### fix(task): batch async task delivery and bridge subprocess intent to TUI (`d890cc24`)
 
 Fixed N completion notifications for N-task batches (now one batch summary). Fixed subprocess
 intent fields (`lastIntent`, `currentTool`, etc.) not propagating to TUI in async path by adding
 `bridgeUpdate` callback merging subprocess `AgentProgress` into `progressByTaskId`.
 
-### fix(lsp): discover language servers from IDE-managed installations (`322ebebe`)
+### fix(lsp): discover language servers from IDE-managed installations (`d822b530`)
 
 `resolveCommand` only checked project-local bin dirs and `$PATH`. Binaries installed by
 JetBrains LSP4IJ at `~/.lsp4ij/lsp/<server>/node_modules/.bin/` were never found, causing
