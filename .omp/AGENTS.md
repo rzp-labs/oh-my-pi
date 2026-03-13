@@ -42,7 +42,7 @@ git flow finish                  # squash-merges into main, deletes branch
 After `finish`, push main:
 
 ```bash
-git push --no-verify origin main
+git push origin main
 ```
 
 The squashed commit becomes a new patch in the stack and will replay cleanly
