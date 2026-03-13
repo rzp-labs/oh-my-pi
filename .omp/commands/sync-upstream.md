@@ -132,10 +132,8 @@ from the changelog and note it as upstreamed.
 ### 9. Push
 
 ```bash
-git push --force-with-lease --no-verify origin main
+git push --force-with-lease origin main
 ```
 
 `--force-with-lease` is required because rebase rewrites history. It fails safely
 if the remote has commits you haven't seen — preventing accidental overwrites.
-
-`--no-verify` bypasses the LFS pre-push hook (git-lfs is not installed here).
