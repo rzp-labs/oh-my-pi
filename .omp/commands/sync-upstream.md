@@ -137,3 +137,34 @@ git push --force-with-lease origin main
 
 `--force-with-lease` is required because rebase rewrites history. It fails safely
 if the remote has commits you haven't seen — preventing accidental overwrites.
+
+
+### 10. Summarise upstream changes
+
+After pushing, produce a plain-English summary of the substantive upstream commits
+so the user understands what changed in their tool without having to read diffs.
+
+**Filter first.** Exclude commits whose subject matches any of:
+- `chore: bump version`
+- `chore: regen`
+- `chore: stale`
+- `style:`
+- `refactor:` (internal restructuring with no behaviour change)
+
+For the remaining commits, collect their SHAs:
+
+```bash
+git log <old-upstream-tip>..<new-upstream-tip> --oneline --no-merges
+```
+
+Dispatch a single `explore` sub-agent with the full list of substantive SHAs.
+Only split into 2 agents if the substantive commit count exceeds ~30.
+
+The agent runs `git show <sha>` for each commit and returns a concise summary:
+what changed, why it matters to the user, any action required (new env var,
+config key, removed tool, etc.).
+
+Roll up into a single grouped response by theme (new providers, tool changes,
+bug fixes, LSP, etc.). Omit anything with no user-visible impact.
+
+Do not pull raw diffs into the root agent context — that is what the sub-agent is for.
