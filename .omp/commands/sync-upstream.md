@@ -34,34 +34,15 @@ Fetch latest:
 git fetch upstream main
 ```
 
-### 2. Report divergence
-
-Count commits ahead/behind:
+### 2. Check divergence
 
 ```bash
-git rev-list --count main..upstream/main    # behind (incoming upstream)
-git rev-list --count upstream/main..main    # ahead (our local patches)
+git rev-list --count main..upstream/main    # behind (incoming)
+git rev-list --count upstream/main..main    # ahead (local patches)
 ```
 
-Present a structured report:
-
-**Local patches (ahead of upstream):** List each with short SHA, subject line,
-and files touched. These are the commits that will be replayed during rebase.
-
-**Upstream incoming (behind):** List commits grouped by package/area. Highlight
-any that touch the same files as local patches — these are conflict risks.
-
-**Conflict risk assessment:** For each local patch that touches the same file as
-an incoming upstream commit, flag it. These patches will likely need manual
-resolution during the rebase.
-
-**Stop here and ask the user for approval.** Present options:
-- Proceed with full rebase
-- Abort (just wanted the report)
-
-Do NOT continue to step 3 without explicit approval.
-
-If `--dry-run` was passed, stop here regardless of response.
+If behind=0, report "already up to date" and stop.
+If `--dry-run` was passed, report the counts and stop.
 
 ### 3. Stash, advance upstream, rebase
 
@@ -94,6 +75,9 @@ Standing rules:
   `packages/fork/CHANGELOG.md` instead.
 - For code conflicts: apply the patch's intent onto upstream's new structure.
   The goal is to preserve what the patch was doing, not preserve its exact lines.
+- **Check for later patches on the same file** before resolving. Run
+  `git log REBASE_HEAD..ORIG_HEAD -- <file>` to see queued patches that also touch it.
+  Resolve in a shape those patches can apply cleanly to — don't satisfy only the current patch.
 
 After resolving each conflicted file: `git add <file>` then `git rebase --continue`.
 
@@ -155,10 +139,3 @@ git push --force-with-lease --no-verify origin main
 if the remote has commits you haven't seen — preventing accidental overwrites.
 
 `--no-verify` bypasses the LFS pre-push hook (git-lfs is not installed here).
-
-### 10. Suggest upstreaming
-
-After syncing, review the local patches. For each one, assess whether it should
-be submitted as a PR to `can1357/oh-my-pi`. Patches that fix genuine bugs (not
-fork-specific customizations) should be upstreamed to eliminate divergence.
-Report your assessment.
