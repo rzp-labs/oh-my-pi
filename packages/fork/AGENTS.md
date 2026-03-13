@@ -21,14 +21,16 @@ main:                        [patch 1] - [patch 2] - [patch 3]
 regular commits. When upstream advances, we rebase `main` onto the new tip —
 patches replay one at a time, conflicts surface per-patch.
 
-### Feature and fix work
+### All changes go through git-flow — no exceptions
 
-Always use git-flow commands — they enforce squash-merge onto `main` and rebase
-when updating from `main`, keeping the patch stack linear.
+Every change to this repo, regardless of size — a one-line edit, a doc update, a
+history cleanup — must go through a branch and squash-merge. Direct commits to
+`main` are never acceptable. The branch enforces a clean patch boundary and ensures
+the squashed commit replays correctly on future upstream rebases.
 
 ```bash
 # Start
-git flow feature start <name>   # new feature
+git flow feature start <name>   # new feature or change
 git flow fix start <name>        # bug fix
 
 # During work — keep branch current with main
