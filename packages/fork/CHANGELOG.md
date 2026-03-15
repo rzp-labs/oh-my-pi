@@ -5,7 +5,7 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ---
 
-## Synced through upstream `d727bf66` — 30 commits (2026-03-14)
+## Synced through upstream `184b2415` — 20 commits (2026-03-14)
 
 ---
 
@@ -80,6 +80,12 @@ the same files. Synthesized: accepted upstream's depth-keyed dedup for ancestor 
 replaced downward walk with explicit `pinnedContextFiles` loading from `.omp/settings.json` (not in
 upstream). Key function: `d < 0 ? path:${file.path} : project:${d}` (infrastructure preserved,
 downward walk superseded by pinning).
+
+Resolution during 184b2415 sync: upstream shipped `context-file.ts` with equivalent depth-keyed
+dedup (`Math.max(0, depth)`) plus a new `toExtensionId` field. `d < 0` branch is dead (no
+downward walk produces negative-depth files). Accepted upstream's `context-file.ts` entirely.
+`state-manager.ts` import conflict resolved by keeping `getProjectDir` (required by
+`contextFileDisplayName`); upstream had independently added it too.
 
 ### fix(task): batch async task delivery and bridge subprocess intent to TUI (`d890cc24`)
 
