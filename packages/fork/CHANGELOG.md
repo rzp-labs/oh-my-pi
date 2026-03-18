@@ -5,7 +5,7 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ---
 
-## Synced through upstream `184b2415` — 20 commits (2026-03-14)
+## Synced through upstream `12022a6f` — 46 commits (2026-03-18)
 
 ---
 
@@ -142,3 +142,5 @@ During 13.9.15 sync: two new upstream tests (`inspect_image` include/exclude) in
 also used the old bare array API. Fixed during rebase (amended into tip commit).
 During 13.10.1+20 sync: upstream `09c16f22` added `search-path-lists.test.ts` with the same
 old bare-array assumption. Fixed `d7fa060c` in post-rebase cleanup.
+During 13.13.2 sync: upstream added `search_tool_bm25` tests in `index.test.ts` and three
+quoted-path tests in `search-path-lists.test.ts` — all using the old bare API. Fixed `16997a81`.
