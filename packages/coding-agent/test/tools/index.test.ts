@@ -240,7 +240,7 @@ describe("createTools", () => {
 
 	it("excludes search_tool_bm25 by default", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).not.toContain("search_tool_bm25");
@@ -252,7 +252,7 @@ describe("createTools", () => {
 				"mcp.discoveryMode": true,
 			}),
 		});
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).not.toContain("search_tool_bm25");
@@ -265,7 +265,7 @@ describe("createTools", () => {
 			}),
 			...createDiscoverySessionHooks(),
 		});
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).toContain("search_tool_bm25");
