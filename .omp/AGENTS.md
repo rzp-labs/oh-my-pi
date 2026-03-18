@@ -34,9 +34,9 @@ git flow fix start <name>        # bug fix
 # During work — keep branch current with main
 git flow update                  # rebases branch from main
 
-# When done
-git flow publish                 # push branch to origin
-git flow finish                  # squash-merges into main, deletes branch
+# When done — publish MUST run before finish
+git flow publish                 # push branch to origin (required: finish fetches it)
+git flow finish                  # squash-merges into main, deletes branch locally and remotely
 ```
 
 After `finish`, push main:
