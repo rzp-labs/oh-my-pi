@@ -1,11 +1,13 @@
 {
   "disabledServers": [
     "circleci-mcp-server",
+    "codacy",
     "deepwiki",
     "devin",
     "firecrawl",
     "linear",
     "morph",
+    "netdata-cloud",
     "nia",
     "nx-mcp",
     "playwright",
