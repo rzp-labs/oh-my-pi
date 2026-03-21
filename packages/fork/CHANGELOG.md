@@ -5,11 +5,28 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ---
 
-## Synced through upstream `12022a6f` — 46 commits (2026-03-18)
+## Synced through upstream `b55dc0d1` — 29 commits (2026-03-23)
 
 ---
 
 ## Active Local Patches
+
+### chore: disable Codacy/Netdata in MCP config (`c4f0919b`)
+
+`.omp/mcp.json` — added exclusions for Codacy and Netdata MCP servers so they
+are not loaded in fork sessions.
+
+### chore: require git flow publish before finish (`dc69c157`)
+
+`git flow finish` fetches the topic branch from origin before merging. Skipping
+publish causes the fetch to fail, leaving changes uncommitted on main. Updated
+both `AGENTS.md` files to mark publish as required, not optional.
+
+### fix(update-check): compare semver instead of string equality (`f1adf7de`)
+
+Update prompt fired on any version mismatch including running ahead of npm
+(e.g. source at 13.13.2 while npm has 13.13.0). Added `isNewerVersion()` for
+proper MAJOR.MINOR.PATCH tuple comparison — prompt only fires when npm is genuinely newer.
 
 ### fix(lsp): always auto-detect servers; apply overrides on top (`38d5bdae`)
 
