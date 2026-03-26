@@ -177,6 +177,8 @@ export interface ToolSession {
 	activateDiscoveredMCPTools?: (toolNames: string[]) => Promise<string[]>;
 	/** Pending action store for preview/apply workflows */
 	pendingActionStore?: import("./pending-action").PendingActionStore;
+	/** Turn-scoped edit queue for coalescing sequential hashline edits to the same file. */
+	editQueue?: import("../patch/edit-queue").EditQueue;
 	/** Get active checkpoint state if any. */
 	getCheckpointState?: () => CheckpointState | undefined;
 	/** Set or clear active checkpoint state. */

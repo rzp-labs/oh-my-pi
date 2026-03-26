@@ -82,6 +82,7 @@ import {
 	summarizeDiscoverableMCPTools,
 } from "./mcp/discoverable-tool-metadata";
 import { buildMemoryToolDeveloperInstructions, getMemoryRoot, startMemoryStartupTask } from "./memories";
+import { EditQueue } from "./patch/edit-queue";
 import asyncResultTemplate from "./prompts/tools/async-result.md" with { type: "text" };
 import { collectEnvSecrets, loadSecrets, obfuscateMessages, SecretObfuscator } from "./secrets";
 import { AgentSession } from "./session/agent-session";
@@ -113,7 +114,6 @@ import {
 	ResolveTool,
 	renderSearchToolBm25Description,
 	type StartupNotice,
-	setPreferredCodeSearchProvider,
 	setPreferredImageProvider,
 	setPreferredSearchProvider,
 	type Tool,
@@ -873,6 +873,8 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 
 	const searchDb = options.searchDb ?? new SearchDb(getSearchDbDir(agentDir));
 	const pendingActionStore = new PendingActionStore();
+	const editQueue = new EditQueue();
+
 	const toolSession: ToolSession = {
 		cwd,
 		hasUI: options.hasUI ?? false,
@@ -922,6 +924,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		asyncJobManager,
 		pendingActionStore,
 		searchDb,
+		editQueue,
 	};
 
 	// Initialize internal URL router for internal protocols (agent://, artifact://, memory://, skill://, rule://, mcp://, local://)
@@ -1556,6 +1559,12 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 		asyncJobManager,
 		pendingActionStore,
 		searchDb,
+	});
+
+	// Flush the edit queue at the end of each model turn so stale baselines
+	// don't carry into the next turn.
+	session.subscribe(event => {
+		if (event.type === "turn_end") editQueue.flush();
 	});
 
 	if (model?.api === "openai-codex-responses") {

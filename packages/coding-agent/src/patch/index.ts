@@ -630,6 +630,7 @@ export class EditTool implements AgentTool<TInput> {
 			const isMoveOnly = Boolean(resolvedMove) && edits.length === 0;
 
 			if (deleteFile) {
+				this.session.editQueue?.flush(absolutePath);
 				if (sourceExists) {
 					await fs.unlink(absolutePath);
 				}
@@ -645,6 +646,7 @@ export class EditTool implements AgentTool<TInput> {
 			}
 
 			if (isMoveOnly && resolvedMove) {
+				this.session.editQueue?.flush(absolutePath);
 				if (!sourceExists) {
 					throw new Error(`File not found: ${path}`);
 				}
@@ -700,11 +702,24 @@ export class EditTool implements AgentTool<TInput> {
 			const { bom, text } = stripBom(rawContent);
 			const originalEnding = detectLineEnding(text);
 			const originalNormalized = normalizeToLF(text);
-			let normalizedText = originalNormalized;
+			// Prepare the queue: on first call to this file this turn, seeds the baseline
+			// from the fresh disk read. On subsequent calls, uses the cached original content
+			// so anchors validate against the pre-edit state the model read from.
+			const queue = this.session.editQueue;
+			const { baseline, allEdits, diffBaseline } = queue
+				? queue.prepare(absolutePath, originalNormalized, anchorEdits)
+				: { baseline: originalNormalized, allEdits: anchorEdits, diffBaseline: originalNormalized };
 
-			// Apply anchor-based edits first (replace, append_at, prepend_at)
-			const anchorResult = applyHashlineEdits(normalizedText, anchorEdits);
-			normalizedText = anchorResult.lines;
+			// Apply all accumulated edits for this file this turn against the immutable baseline.
+			let anchorResult: ReturnType<typeof applyHashlineEdits>;
+			try {
+				anchorResult = applyHashlineEdits(baseline, allEdits);
+			} catch (err) {
+				// Flush the queue entry so the model starts fresh after re-reading.
+				queue?.flush(absolutePath);
+				throw err;
+			}
+			const normalizedText = anchorResult.lines;
 
 			const importResult = applyRequestedImports(move ?? path, normalizedText, imports, this.#manageImports);
 			const result = {
@@ -713,7 +728,7 @@ export class EditTool implements AgentTool<TInput> {
 				warnings: [...(anchorResult.warnings ?? []), ...importResult.warnings],
 				noopEdits: anchorResult.noopEdits,
 			};
-			if (originalNormalized === result.text && !move) {
+			if (diffBaseline === result.text && !move) {
 				let diagnostic = `No changes made to ${path}. The edits produced identical content.`;
 				if (result.noopEdits && result.noopEdits.length > 0) {
 					const details = result.noopEdits
@@ -783,7 +798,10 @@ export class EditTool implements AgentTool<TInput> {
 			} else {
 				invalidateFsScanAfterWrite(absolutePath);
 			}
-			const diffResult = generateDiffString(originalNormalized, result.text);
+			queue?.recordWrite(absolutePath, result.text);
+			// Diff against the previous write (not the original) so each call's response
+			// shows only its own delta — not the growing cumulative diff.
+			const diffResult = generateDiffString(diffBaseline, result.text);
 
 			const meta = outputMeta()
 				.diagnostics(diagnostics?.summary ?? "", diagnostics?.messages ?? [])

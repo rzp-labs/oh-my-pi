@@ -843,6 +843,10 @@ export class ReadTool implements AgentTool<typeof readSchema, ReadToolDetails> {
 				content = [{ type: "text", text: `[Cannot read ${ext} file: conversion failed]` }];
 			}
 		} else {
+			// Reading a file the model has edited this turn invalidates the queue baseline —
+			// the model is acquiring new anchors from the current disk state.
+			this.session.editQueue?.flush(absolutePath);
+
 			// Read as text using streaming to avoid loading huge files into memory
 			const startLine = offset ? Math.max(0, offset - 1) : 0;
 			const startLineDisplay = startLine + 1; // For display (1-indexed)
