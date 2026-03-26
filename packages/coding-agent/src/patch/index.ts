@@ -42,6 +42,7 @@ import {
 	buildCompactHashlineDiffPreview,
 	computeLineHash,
 	type HashlineEdit,
+	HashlineMismatchError,
 	parseTag,
 } from "./hashline";
 // Internal imports
@@ -711,12 +712,16 @@ export class EditTool implements AgentTool<TInput> {
 				: { baseline: originalNormalized, allEdits: anchorEdits, diffBaseline: originalNormalized };
 
 			// Apply all accumulated edits for this file this turn against the immutable baseline.
+			// On HashlineMismatchError: keep the queue alive — the error's remapped hashes describe
+			// the cached baseline and are valid for a retry against it.
+			// On any other error: flush so the model starts fresh against current disk state.
 			let anchorResult: ReturnType<typeof applyHashlineEdits>;
 			try {
 				anchorResult = applyHashlineEdits(baseline, allEdits);
 			} catch (err) {
-				// Flush the queue entry so the model starts fresh after re-reading.
-				queue?.flush(absolutePath);
+				if (!(err instanceof HashlineMismatchError)) {
+					queue?.flush(absolutePath);
+				}
 				throw err;
 			}
 			const normalizedText = anchorResult.lines;
@@ -785,20 +790,25 @@ export class EditTool implements AgentTool<TInput> {
 
 			const finalContent = bom + restoreLineEndings(result.text, originalEnding);
 			const writePath = resolvedMove ?? absolutePath;
-			const diagnostics = await this.#writethrough(
-				writePath,
-				finalContent,
-				signal,
-				Bun.file(writePath),
-				batchRequest,
-			);
+			let diagnostics: Awaited<ReturnType<WritethroughCallback>>;
+			try {
+				diagnostics = await this.#writethrough(writePath, finalContent, signal, Bun.file(writePath), batchRequest);
+			} catch (err) {
+				// I/O failure after prepare() appended edits — state unknown; flush so
+				// the next attempt starts from current disk state.
+				queue?.flush(absolutePath);
+				throw err;
+			}
 			if (resolvedMove && resolvedMove !== absolutePath) {
 				await fs.unlink(absolutePath);
 				invalidateFsScanAfterRename(absolutePath, resolvedMove);
+				// Source no longer exists; flush its queue entry and track the destination.
+				queue?.flush(absolutePath);
+				queue?.recordWrite(resolvedMove, result.text);
 			} else {
 				invalidateFsScanAfterWrite(absolutePath);
+				queue?.recordWrite(absolutePath, result.text);
 			}
-			queue?.recordWrite(absolutePath, result.text);
 			// Diff against the previous write (not the original) so each call's response
 			// shows only its own delta — not the growing cumulative diff.
 			const diffResult = generateDiffString(diffBaseline, result.text);
