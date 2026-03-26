@@ -290,7 +290,8 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 		const headLines = head;
 		const tailLines = tail;
 
-		// Check interception if enabled and available tools are known
+		// Check interception if enabled and available tools are known.
+		// When tool names are absent, treat availability as unknown and do not suppress rules.
 		if (this.session.settings.get("bashInterceptor.enabled")) {
 			const rules = this.session.settings.getBashInterceptorRules();
 			const interception = checkBashInterception(command, ctx?.toolNames ?? [], rules);
