@@ -10,6 +10,7 @@ import { type BashResult, executeBash } from "../exec/bash-executor";
 import type { RenderResultOptions } from "../extensibility/custom-tools/types";
 import { truncateToVisualLines } from "../modes/components/visual-truncate";
 import type { Theme } from "../modes/theme/theme";
+import { resolveEditMode } from "../patch";
 import bashDescription from "../prompts/tools/bash.md" with { type: "text" };
 import { DEFAULT_MAX_BYTES, TailBuffer } from "../session/streaming-output";
 import { renderStatusLine } from "../tui";
@@ -202,6 +203,30 @@ function getBashEnvForDisplay(args: BashRenderArgs): Record<string, string> | un
 	return args.env ?? partialEnv;
 }
 /**
+ * Build a user-facing error message for a blocked bash command.
+ * For `edit`-tool redirections the message reflects the active edit mode,
+ * since the editing interface (replace / patch / hashline) determines what
+ * the model should actually do next.
+ */
+function buildInterceptionMessage(
+	interception: import("./bash-interceptor").InterceptionResult,
+	command: string,
+	session: import(".").ToolSession,
+): string {
+	if (interception.suggestedTool === "edit") {
+		const mode = resolveEditMode(session);
+		const modeLabel =
+			mode === "hashline"
+				? "anchor-based (LINE#ID) editing"
+				: mode === "patch"
+					? "diff-patch editing"
+					: "fuzzy replace editing";
+		return `Blocked: Use the \`edit\` tool instead (${modeLabel} is active).\n\nOriginal command: ${command}`;
+	}
+	return interception.message ?? "Command blocked";
+}
+
+/**
  * Bash tool implementation.
  *
  * Executes bash commands with optional timeout and working directory.
@@ -296,7 +321,7 @@ export class BashTool implements AgentTool<BashToolSchema, BashToolDetails> {
 			const rules = this.session.settings.getBashInterceptorRules();
 			const interception = checkBashInterception(command, ctx?.toolNames ?? [], rules);
 			if (interception.block) {
-				throw new ToolError(interception.message ?? "Command blocked");
+				throw new ToolError(buildInterceptionMessage(interception, command, this.session));
 			}
 		}
 

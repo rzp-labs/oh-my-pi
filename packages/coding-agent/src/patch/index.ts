@@ -469,6 +469,22 @@ function getRequestedImports(params: ReplaceParams | PatchParams | HashlineParam
 }
 
 /**
+ * Resolve the active edit mode for a session, applying the same priority order
+ * used by EditTool: env override → model-specific setting → spark heuristic → global setting → default.
+ * Exported so callers (e.g. bash interceptor) can generate mode-aware messages without an EditTool instance.
+ */
+export function resolveEditMode(session: ToolSession, envOverride?: EditMode): EditMode {
+	if (envOverride) return envOverride;
+	const activeModel = session.getActiveModelString?.();
+	const modelVariant = session.settings.getEditVariantForModel(activeModel);
+	if (modelVariant) return modelVariant;
+	if (activeModel?.includes("-spark")) return "replace";
+	const settingsMode = normalizeEditMode(session.settings.get("edit.mode"));
+	if (settingsMode) return settingsMode;
+	return DEFAULT_EDIT_MODE;
+}
+
+/**
  * Edit tool implementation.
  *
  * Creates replace-mode, patch-mode, or hashline-mode behavior based on session settings.
@@ -548,18 +564,7 @@ export class EditTool implements AgentTool<TInput> {
 	 * This is re-evaluated on each access so tool definitions stay current when model changes.
 	 */
 	get mode(): EditMode {
-		if (this.#editMode) return this.#editMode;
-		// 1. Check if edit mode is explicitly set for this model
-		const activeModel = this.session.getActiveModelString?.();
-		const modelVariant = this.session.settings.getEditVariantForModel(activeModel);
-		if (modelVariant) return modelVariant;
-		// 2. Check if model contains "-spark" substring (default to replace mode)
-		if (activeModel?.includes("-spark")) return "replace";
-		// 3. Check if edit mode is explicitly set in session settings
-		const settingsMode = normalizeEditMode(this.session.settings.get("edit.mode"));
-		if (settingsMode) return settingsMode;
-		// 4. Default to DEFAULT_EDIT_MODE
-		return DEFAULT_EDIT_MODE;
+		return resolveEditMode(this.session, this.#editMode ?? undefined);
 	}
 
 	/**
