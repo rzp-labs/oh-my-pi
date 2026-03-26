@@ -49,8 +49,9 @@ export function checkBashInterception(
 	const compiled = compileRules(rules);
 
 	for (const { rule, regex } of compiled) {
-		// Only block if the suggested tool is actually available
-		if (!availableTools.includes(rule.tool)) {
+		// Skip if tool availability is known and the tool is absent. When the list is
+		// empty (context not yet hydrated), treat availability as unknown and block.
+		if (availableTools.length > 0 && !availableTools.includes(rule.tool)) {
 			continue;
 		}
 
