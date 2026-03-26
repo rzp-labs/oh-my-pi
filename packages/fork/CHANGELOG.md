@@ -5,7 +5,7 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ---
 
-## Synced through upstream `c05cf897` — 2 commits (2026-03-26)
+## Synced through upstream `d155ae83` — 13 commits (2026-03-26)
 
 ---
 
