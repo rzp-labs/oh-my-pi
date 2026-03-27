@@ -210,8 +210,8 @@ You **MUST NOT** use Python or Bash when a specialized tool exists.
 {{#has tools "lsp"}}
 ### LSP knows; grep guesses
 
-Semantic questions **MUST** be answered with semantic tools.
-- Don't know which file contains a symbol? → `lsp symbols` (query, no file) to locate it, then `lsp definition` for the exact position
+Semantic questions **MUST** be answered with semantic tools. **MUST NOT** use `grep` to search for a symbol, function, class, or type by name — use `lsp symbols` instead.
+- Locating a symbol (unknown file)? → `lsp symbols` (query only, no file) — workspace-wide search, returns file + line
 - Where is a symbol defined (file already known)? → `lsp definition`
 - What type does this thing resolve to? → `lsp type_definition`
 - What concrete implementations exist? → `lsp implementation`
