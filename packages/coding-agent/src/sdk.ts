@@ -132,6 +132,7 @@ import { ToolContextStore } from "./tools/context";
 import { getGeminiImageTools } from "./tools/gemini-image";
 import { wrapToolWithMetaNotice } from "./tools/output-meta";
 import { queueResolveHandler } from "./tools/resolve";
+import { TOOL_TIMEOUTS } from "./tools/tool-timeouts";
 import { EventBus } from "./utils/event-bus";
 import { buildNamedToolChoice } from "./utils/tool-choice";
 
@@ -1507,11 +1508,18 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			return key;
 		},
 		cursorExecHandlers,
-		transformToolCallArguments: (args, _toolName) => {
+		transformToolCallArguments: (args, toolName) => {
 			let result = args;
 			const maxTimeout = settings.get("tools.maxTimeout");
-			if (maxTimeout > 0 && typeof result.timeout === "number") {
-				result = { ...result, timeout: Math.min(result.timeout, maxTimeout) };
+			if (maxTimeout > 0) {
+				if (typeof result.timeout === "number") {
+					// Model provided an explicit timeout — clamp it to the ceiling.
+					result = { ...result, timeout: Math.min(result.timeout, maxTimeout) };
+				} else if (result.timeout === undefined && toolName in TOOL_TIMEOUTS) {
+					// Model omitted timeout — inject the ceiling so the tool's hardcoded
+					// default (e.g. bash 300s) doesn't silently bypass tools.maxTimeout.
+					result = { ...result, timeout: maxTimeout };
+				}
 			}
 			if (obfuscator?.hasSecrets()) {
 				result = obfuscator.deobfuscateObject(result);
