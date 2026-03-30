@@ -107,7 +107,12 @@ describe("hashline edit queue", () => {
 
 		const call2 = await tool.execute("q-test-1-call-2", {
 			path: filePath,
-			edits: [{ loc: { line: tagFor(betaAnchor) }, content: ["function betaRenamed() {"] }],
+			edits: [
+				{
+					loc: { range: { pos: tagFor(betaAnchor), end: tagFor(betaAnchor) } },
+					content: ["function betaRenamed() {"],
+				},
+			],
 		});
 		expect(getTextOutput(call2)).toContain("Changes: +1 -1");
 
@@ -136,7 +141,12 @@ describe("hashline edit queue", () => {
 		await expect(
 			tool.execute("q-test-2-call-2", {
 				path: filePath,
-				edits: [{ loc: { line: tagFor(betaAnchor) }, content: ["function betaRenamed() {"] }],
+				edits: [
+					{
+						loc: { range: { pos: tagFor(betaAnchor), end: tagFor(betaAnchor) } },
+						content: ["function betaRenamed() {"],
+					},
+				],
 			}),
 		).rejects.toThrow();
 	});
@@ -165,7 +175,12 @@ describe("hashline edit queue", () => {
 
 		await tool.execute("q-test-3-call-2", {
 			path: filePath,
-			edits: [{ loc: { line: tagFor(currentBetaAnchor) }, content: ["function betaRenamed() {"] }],
+			edits: [
+				{
+					loc: { range: { pos: tagFor(currentBetaAnchor), end: tagFor(currentBetaAnchor) } },
+					content: ["function betaRenamed() {"],
+				},
+			],
 		});
 
 		const content = await readText(filePath);
@@ -192,7 +207,12 @@ describe("hashline edit queue", () => {
 
 		const call2 = await tool.execute("q-test-4-call-2", {
 			path: filePath,
-			edits: [{ loc: { line: tagFor(betaAnchor) }, content: ["function betaRenamed() {"] }],
+			edits: [
+				{
+					loc: { range: { pos: tagFor(betaAnchor), end: tagFor(betaAnchor) } },
+					content: ["function betaRenamed() {"],
+				},
+			],
 		});
 		const text2 = getTextOutput(call2);
 		expect(text2).toContain("Changes: +1 -1");

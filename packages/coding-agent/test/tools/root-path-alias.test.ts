@@ -47,7 +47,7 @@ describe("tool path root alias", () => {
 	});
 
 	it("greps from cwd when path is slash", async () => {
-		const tools = await createTools(createTestSession(tempDir));
+		const { tools } = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "grep");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing grep tool");
@@ -63,7 +63,7 @@ describe("tool path root alias", () => {
 	});
 
 	it("reads cwd when path is slash", async () => {
-		const tools = await createTools(createTestSession(tempDir));
+		const { tools } = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "read");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing read tool");
@@ -77,7 +77,7 @@ describe("tool path root alias", () => {
 	});
 
 	it("finds from cwd when pattern is slash", async () => {
-		const tools = await createTools(createTestSession(tempDir));
+		const { tools } = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "find");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing find tool");
@@ -94,7 +94,7 @@ describe("tool path root alias", () => {
 	});
 
 	it("ast_grep searches cwd when path is slash", async () => {
-		const tools = await createTools(createTestSession(tempDir));
+		const { tools } = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "ast_grep");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing ast_grep tool");
@@ -114,7 +114,7 @@ describe("tool path root alias", () => {
 
 	it("ast_edit rewrites within cwd when path is slash", async () => {
 		const pendingActionStore = new PendingActionStore();
-		const tools = await createTools(createTestSession(tempDir, { pendingActionStore }));
+		const { tools } = await createTools(createTestSession(tempDir, { pendingActionStore }));
 		const tool = tools.find(entry => entry.name === "ast_edit");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing ast_edit tool");

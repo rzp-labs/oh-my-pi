@@ -5,7 +5,7 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ---
 
-## Synced through upstream `d155ae83` — 13 commits (2026-03-26)
+## Synced through upstream `bf223682` — 105 commits (2026-03-27)
 
 ---
 
@@ -22,12 +22,9 @@ are not loaded in fork sessions.
 publish causes the fetch to fail, leaving changes uncommitted on main. Updated
 both `AGENTS.md` files to mark publish as required, not optional.
 
-### fix(update-check): compare semver instead of string equality (`f1adf7de`)
+~~### fix(update-check): compare semver instead of string equality (`f1adf7de`)~~
 
-Update prompt fired on any version mismatch including running ahead of npm
-(e.g. source at 13.13.2 while npm has 13.13.0). Added `isNewerVersion()` for
-proper MAJOR.MINOR.PATCH tuple comparison — prompt only fires when npm is genuinely newer.
-
+**Upstreamed** — absorbed during `bf223682` rebase. Upstream independently adopted `Bun.semver.order()` for the same fix. Patch dropped.
 ### fix(lsp): always auto-detect servers; apply overrides on top (`38d5bdae`)
 
 Always auto-detect servers regardless of whether config overrides are present.
