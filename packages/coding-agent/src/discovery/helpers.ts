@@ -607,6 +607,27 @@ export interface ClaudePluginsRegistry {
 }
 
 /**
+ * Contents of a plugin's .claude-plugin/plugin.json manifest.
+ */
+export interface ClaudePluginManifest {
+	name?: string;
+	description?: string;
+	version?: string;
+	/** Path to skills dir, relative to plugin root. Default: "skills" */
+	skills?: string;
+	/** Path(s) to commands dir(s), relative to plugin root. Default: "commands" */
+	commands?: string | string[];
+	/** Path(s) to agents dir(s), relative to plugin root. Default: "agents" */
+	agents?: string | string[];
+	/** Path to hooks base dir, relative to plugin root. Default: "hooks" */
+	hooks?: string;
+	/** Path(s) to tools dir(s), relative to plugin root. Default: "tools" */
+	tools?: string | string[];
+	/** Path to .mcp.json file, relative to plugin root. Default: ".mcp.json" */
+	mcpServers?: string;
+}
+
+/**
  * Resolved plugin root for loading.
  */
 export interface ClaudePluginRoot {
@@ -622,6 +643,8 @@ export interface ClaudePluginRoot {
 	path: string;
 	/** Whether this is a user or project scope plugin */
 	scope: "user" | "project";
+	/** Loaded from <path>/.claude-plugin/plugin.json if it exists */
+	manifest?: ClaudePluginManifest;
 }
 
 /**
@@ -708,6 +731,21 @@ export async function resolveOrDefaultProjectRegistryPath(cwd: string): Promise<
 	// as both user and project registry and producing duplicates / disambiguation errors.
 	if (path.resolve(cwd) === os.homedir()) return undefined;
 	return path.join(cwd, getConfigDirName(), "plugins", "installed_plugins.json");
+}
+
+/**
+ * Load a plugin's manifest from <installPath>/.claude-plugin/plugin.json.
+ * Returns undefined if the file is absent or contains invalid JSON.
+ */
+async function loadPluginManifest(installPath: string): Promise<ClaudePluginManifest | undefined> {
+	const manifestPath = path.join(installPath, ".claude-plugin", "plugin.json");
+	const content = await readFile(manifestPath);
+	if (!content) return undefined;
+	try {
+		return JSON.parse(content) as ClaudePluginManifest;
+	} catch {
+		return undefined;
+	}
 }
 
 const pluginRootsCache = new Map<string, { roots: ClaudePluginRoot[]; warnings: string[] }>();
@@ -878,6 +916,14 @@ export async function listClaudePluginRoots(
 		roots.length = 0;
 		roots.push(...injectedPluginDirRoots, ...filtered);
 	}
+
+	// Load plugin manifests in parallel — read once, used by all capability loaders
+	await Promise.all(
+		roots.map(async root => {
+			const manifest = await loadPluginManifest(root.path);
+			if (manifest) (root as ClaudePluginRoot).manifest = manifest;
+		}),
+	);
 
 	const result = { roots, warnings };
 	pluginRootsCache.set(cacheKey, result);
