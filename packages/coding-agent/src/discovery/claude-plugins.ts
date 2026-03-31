@@ -41,7 +41,9 @@ async function loadSkills(ctx: LoadContext): Promise<LoadResult<Skill>> {
 
 	const results = await Promise.all(
 		roots.map(async root => {
-			const skillsDir = path.join(root.path, "skills");
+			const skillsDir = root.manifest?.skills
+				? path.resolve(root.path, root.manifest.skills)
+				: path.join(root.path, "skills");
 			const result = await scanSkillsFromDir(ctx, {
 				dir: skillsDir,
 				providerId: PROVIDER_ID,
@@ -75,26 +77,38 @@ async function loadSlashCommands(ctx: LoadContext): Promise<LoadResult<SlashComm
 
 	const results = await Promise.all(
 		roots.map(async root => {
-			const commandsDir = path.join(root.path, "commands");
-			return loadFilesFromDir<SlashCommand>(ctx, commandsDir, PROVIDER_ID, root.scope, {
-				extensions: ["md"],
-				transform: (name, content, filePath, source) => {
-					const cmdName = name.replace(/\.md$/, "");
-					return {
-						name: root.plugin ? `${root.plugin}:${cmdName}` : cmdName,
-						path: filePath,
-						content,
-						level: root.scope,
-						_source: source,
-					};
-				},
-			});
+			// Resolve one or more command directories from manifest, fall back to "commands"
+			const rawCommands = root.manifest?.commands;
+			const commandDirs = rawCommands
+				? (Array.isArray(rawCommands) ? rawCommands : [rawCommands]).map(p =>
+						path.resolve(root.path, p),
+				  )
+				: [path.join(root.path, "commands")];
+			return Promise.all(
+				commandDirs.map(commandsDir =>
+					loadFilesFromDir<SlashCommand>(ctx, commandsDir, PROVIDER_ID, root.scope, {
+						extensions: ["md"],
+						transform: (name, content, filePath, source) => {
+							const cmdName = name.replace(/\.md$/, "");
+							return {
+								name: root.plugin ? `${root.plugin}:${cmdName}` : cmdName,
+								path: filePath,
+								content,
+								level: root.scope,
+								_source: source,
+							};
+						},
+					}),
+				),
+			);
 		}),
 	);
 
-	for (const result of results) {
-		items.push(...result.items);
-		if (result.warnings) warnings.push(...result.warnings);
+	for (const resultArr of results) {
+		for (const result of resultArr) {
+			items.push(...result.items);
+			if (result.warnings) warnings.push(...result.warnings);
+		}
 	}
 
 	return { items, warnings };
@@ -122,7 +136,10 @@ async function loadHooks(ctx: LoadContext): Promise<LoadResult<Hook>> {
 
 	const results = await Promise.all(
 		loadTasks.map(async ({ root, hookType }) => {
-			const hooksDir = path.join(root.path, "hooks", hookType);
+			const hooksBase = root.manifest?.hooks
+				? path.resolve(root.path, root.manifest.hooks)
+				: path.join(root.path, "hooks");
+			const hooksDir = path.join(hooksBase, hookType);
 			return loadFilesFromDir<Hook>(ctx, hooksDir, PROVIDER_ID, root.scope, {
 				transform: (name, _content, filePath, source) => {
 					const toolName = name.replace(/\.(sh|bash|zsh|fish)$/, "");
@@ -160,25 +177,36 @@ async function loadTools(ctx: LoadContext): Promise<LoadResult<CustomTool>> {
 
 	const results = await Promise.all(
 		roots.map(async root => {
-			const toolsDir = path.join(root.path, "tools");
-			return loadFilesFromDir<CustomTool>(ctx, toolsDir, PROVIDER_ID, root.scope, {
-				transform: (name, _content, filePath, source) => {
-					const toolName = name.replace(/\.(ts|js|sh|bash|py)$/, "");
-					return {
-						name: toolName,
-						path: filePath,
-						description: `${toolName} custom tool`,
-						level: root.scope,
-						_source: source,
-					};
-				},
-			});
+			const rawTools = root.manifest?.tools;
+			const toolDirs = rawTools
+				? (Array.isArray(rawTools) ? rawTools : [rawTools]).map(p =>
+						path.resolve(root.path, p),
+				  )
+				: [path.join(root.path, "tools")];
+			return Promise.all(
+				toolDirs.map(toolsDir =>
+					loadFilesFromDir<CustomTool>(ctx, toolsDir, PROVIDER_ID, root.scope, {
+						transform: (name, _content, filePath, source) => {
+							const toolName = name.replace(/\.(ts|js|sh|bash|py)$/, "");
+							return {
+								name: toolName,
+								path: filePath,
+								description: `${toolName} custom tool`,
+								level: root.scope,
+								_source: source,
+							};
+						},
+					}),
+				),
+			);
 		}),
 	);
 
-	for (const result of results) {
-		items.push(...result.items);
-		if (result.warnings) warnings.push(...result.warnings);
+	for (const resultArr of results) {
+		for (const result of resultArr) {
+			items.push(...result.items);
+			if (result.warnings) warnings.push(...result.warnings);
+		}
 	}
 
 	return { items, warnings };
@@ -196,7 +224,9 @@ async function loadMCPServers(ctx: LoadContext): Promise<LoadResult<MCPServer>> 
 	warnings.push(...rootWarnings);
 
 	for (const root of roots) {
-		const mcpPath = path.join(root.path, ".mcp.json");
+		const mcpPath = root.manifest?.mcpServers
+			? path.resolve(root.path, root.manifest.mcpServers)
+			: path.join(root.path, ".mcp.json");
 		const raw = await readFile(mcpPath);
 		if (raw === null) continue; // file absent — skip silently
 

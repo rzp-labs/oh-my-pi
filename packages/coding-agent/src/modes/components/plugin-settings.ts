@@ -2,7 +2,7 @@
  * Plugin settings UI components.
  *
  * Provides a hierarchical settings interface:
- * - Plugin list (shows all installed plugins)
+ * - Plugin list (shows all installed plugins — npm-style and marketplace)
  *   - Plugin detail (enable/disable, features, config)
  *     - Feature toggles
  *     - Config value editor
@@ -17,17 +17,104 @@ import {
 	Spacer,
 	Text,
 } from "@oh-my-pi/pi-tui";
+import { clearClaudePluginRootsCache } from "../../discovery/helpers";
+import { MarketplaceManager } from "../../extensibility/plugins/marketplace/manager";
+import {
+	getInstalledPluginsRegistryPath,
+	getMarketplacesCacheDir,
+	getMarketplacesRegistryPath,
+	getPluginsCacheDir,
+} from "../../extensibility/plugins/marketplace/registry";
+import type { InstalledPluginEntry } from "../../extensibility/plugins/marketplace/types";
 import { PluginManager } from "../../extensibility/plugins/manager";
 import type { InstalledPlugin, PluginSettingSchema } from "../../extensibility/plugins/types";
 import { getSelectListTheme, getSettingsListTheme, theme } from "../../modes/theme/theme";
 import { DynamicBorder } from "./dynamic-border";
 
 // =============================================================================
+// Unified display type
+// =============================================================================
+
+/** Unified plugin entry for display — covers both npm-style and marketplace plugins. */
+interface PluginListEntry {
+	/** Display name */
+	name: string;
+	/** Version string */
+	version: string;
+	/** Whether the plugin is currently enabled */
+	enabled: boolean;
+	/** "npm" = old PluginManager system, "marketplace" = installed_plugins.json */
+	source: "npm" | "marketplace";
+	/** For npm plugins: the full InstalledPlugin object */
+	npmPlugin?: InstalledPlugin;
+	/** For marketplace plugins: the plugin ID ("name@marketplace") */
+	marketplaceId?: string;
+	/** Human-readable description from manifest */
+	description?: string;
+	/** Marketplace name (for display) */
+	marketplace?: string;
+}
+
+// =============================================================================
+// Marketplace plugin loader
+// =============================================================================
+
+/** Load marketplace-installed plugins as PluginListEntry[]. Never throws — returns [] on any error. */
+async function loadMarketplacePlugins(): Promise<PluginListEntry[]> {
+	try {
+		const manager = new MarketplaceManager({
+			marketplacesRegistryPath: getMarketplacesRegistryPath(),
+			installedRegistryPath: getInstalledPluginsRegistryPath(),
+			marketplacesCacheDir: getMarketplacesCacheDir(),
+			pluginsCacheDir: getPluginsCacheDir(),
+			clearPluginRootsCache: clearClaudePluginRootsCache,
+		});
+
+		const installed = await manager.listInstalledPlugins();
+		const entries: PluginListEntry[] = [];
+
+		for (const { id, entries: pluginEntries } of installed) {
+			if (pluginEntries.length === 0) continue;
+			const entry = pluginEntries[0] as InstalledPluginEntry;
+
+			// Parse id: "name@marketplace" — split on last @
+			const atIdx = id.lastIndexOf("@");
+			const name = atIdx !== -1 ? id.slice(0, atIdx) : id;
+			const marketplace = atIdx !== -1 ? id.slice(atIdx + 1) : undefined;
+
+			// Best-effort read of plugin.json for description
+			let description: string | undefined;
+			try {
+				const manifestPath = `${entry.installPath}/.claude-plugin/plugin.json`;
+				const manifest = await Bun.file(manifestPath).json();
+				description = typeof manifest?.description === "string" ? manifest.description : undefined;
+			} catch {
+				// missing or malformed — not an error
+			}
+
+			entries.push({
+				name,
+				version: entry.version,
+				enabled: entry.enabled !== false, // undefined/true → enabled
+				source: "marketplace",
+				marketplaceId: id,
+				description,
+				marketplace,
+			});
+		}
+
+		return entries;
+	} catch {
+		return [];
+	}
+}
+
+// =============================================================================
 // Plugin List Component
 // =============================================================================
 
 export interface PluginListCallbacks {
-	onPluginSelect: (plugin: InstalledPlugin) => void;
+	onPluginSelect: (plugin: PluginListEntry) => void;
 	onCancel: () => void;
 }
 
@@ -39,7 +126,7 @@ export class PluginListComponent extends Container {
 	readonly #selectList: SelectList;
 
 	constructor(
-		private readonly plugins: InstalledPlugin[],
+		private readonly plugins: PluginListEntry[],
 		callbacks: PluginListCallbacks,
 	) {
 		super();
@@ -52,7 +139,13 @@ export class PluginListComponent extends Container {
 		if (plugins.length === 0) {
 			this.addChild(new Text(theme.fg("muted", "  No plugins installed"), 0, 0));
 			this.addChild(new Spacer(1));
-			this.addChild(new Text(theme.fg("dim", "  Install with: omp plugin install <package>"), 0, 0));
+			this.addChild(
+				new Text(
+					theme.fg("dim", "  Install from marketplace: omp marketplace install <name>@<marketplace>"),
+					0,
+					0,
+				),
+			);
 			this.addChild(new Spacer(1));
 			this.addChild(new DynamicBorder());
 
@@ -66,16 +159,22 @@ export class PluginListComponent extends Container {
 			const status = p.enabled
 				? theme.fg("success", theme.status.enabled)
 				: theme.fg("muted", theme.status.disabled);
-			const featureCount = p.manifest.features ? Object.keys(p.manifest.features).length : 0;
-			const enabledCount = p.enabledFeatures?.length ?? featureCount;
 
 			let details = `v${p.version}`;
-			if (featureCount > 0) {
-				details += ` ${theme.sep.dot} ${enabledCount}/${featureCount} features`;
+
+			// Feature count only available for npm plugins with a manifest
+			if (p.source === "npm" && p.npmPlugin?.manifest.features) {
+				const featureCount = Object.keys(p.npmPlugin.manifest.features).length;
+				const enabledCount = p.npmPlugin.enabledFeatures?.length ?? featureCount;
+				if (featureCount > 0) {
+					details += ` ${theme.sep.dot} ${enabledCount}/${featureCount} features`;
+				}
+			} else if (p.marketplace) {
+				details += ` ${theme.sep.dot} ${p.marketplace}`;
 			}
 
 			return {
-				value: p.name,
+				value: p.name + (p.source === "marketplace" ? `\x00${p.marketplaceId ?? ""}` : ""),
 				label: `${status} ${p.name}`,
 				description: details,
 			};
@@ -84,7 +183,11 @@ export class PluginListComponent extends Container {
 		this.#selectList = new SelectList(items, Math.min(items.length, 8), getSelectListTheme());
 
 		this.#selectList.onSelect = item => {
-			const plugin = this.plugins.find(p => p.name === item.value);
+			// Recover the plugin by matching on the composite value key
+			const plugin = this.plugins.find(p => {
+				const key = p.name + (p.source === "marketplace" ? `\x00${p.marketplaceId ?? ""}` : "");
+				return key === item.value;
+			});
 			if (plugin) {
 				callbacks.onPluginSelect(plugin);
 			}
@@ -104,7 +207,7 @@ export class PluginListComponent extends Container {
 }
 
 // =============================================================================
-// Plugin Detail Component
+// Plugin Detail Component (npm-style plugins)
 // =============================================================================
 
 export interface PluginDetailCallbacks {
@@ -115,7 +218,7 @@ export interface PluginDetailCallbacks {
 }
 
 /**
- * Shows detail settings for a single plugin:
+ * Shows detail settings for a single npm-style plugin:
  * - Enable/disable toggle
  * - Feature toggles
  * - Config settings
@@ -282,6 +385,75 @@ export class PluginDetailComponent extends Container {
 }
 
 // =============================================================================
+// Marketplace Plugin Detail Component
+// =============================================================================
+
+/**
+ * Simple detail view for a marketplace-installed plugin.
+ * Shows metadata and provides an enable/disable toggle.
+ */
+class MarketplacePluginDetailComponent extends Container {
+	#settingsList: SettingsList;
+
+	constructor(
+		private entry: PluginListEntry,
+		private readonly onEnabledChange: (enabled: boolean) => Promise<void>,
+		private readonly onBack: () => void,
+	) {
+		super();
+
+		// Header
+		this.addChild(new DynamicBorder());
+		this.addChild(new Text(theme.bold(theme.fg("accent", `  ${entry.name}`)), 0, 0));
+		if (entry.description) {
+			this.addChild(new Text(theme.fg("muted", `  ${entry.description}`), 0, 0));
+		}
+		this.addChild(new Spacer(1));
+
+		// Metadata
+		this.addChild(new Text(theme.fg("dim", `  Version: ${entry.version}`), 0, 0));
+		if (entry.marketplace) {
+			this.addChild(new Text(theme.fg("dim", `  Marketplace: ${entry.marketplace}`), 0, 0));
+		}
+		this.addChild(new Spacer(1));
+
+		// Settings: enable/disable toggle
+		const items: SettingItem[] = [
+			{
+				id: "__enabled__",
+				label: "Enabled",
+				description: "Enable or disable this plugin",
+				currentValue: entry.enabled ? "true" : "false",
+				values: ["true", "false"],
+			},
+		];
+
+		this.#settingsList = new SettingsList(
+			items,
+			Math.min(items.length, 10),
+			getSettingsListTheme(),
+			(id, newValue) => {
+				if (id === "__enabled__") {
+					const enabled = newValue === "true";
+					this.entry = { ...this.entry, enabled };
+					void this.onEnabledChange(enabled);
+				}
+			},
+			this.onBack,
+		);
+
+		this.addChild(this.#settingsList);
+		this.addChild(new Spacer(1));
+		this.addChild(new Text(theme.fg("dim", "  Enter to edit · Esc to go back"), 0, 0));
+		this.addChild(new DynamicBorder());
+	}
+
+	handleInput(data: string): void {
+		this.#settingsList.handleInput(data);
+	}
+}
+
+// =============================================================================
 // Config Submenus
 // =============================================================================
 
@@ -415,7 +587,7 @@ export class PluginSettingsComponent extends Container {
 	// biome-ignore lint/correctness/noUnusedPrivateClassMembers: state tracking for view management
 	#currentView: "list" | "detail" = "list";
 	// biome-ignore lint/correctness/noUnusedPrivateClassMembers: state tracking for view management
-	#currentPlugin: InstalledPlugin | null = null;
+	#currentPlugin: PluginListEntry | null = null;
 
 	constructor(
 		cwd: string,
@@ -431,42 +603,76 @@ export class PluginSettingsComponent extends Container {
 		this.#currentPlugin = null;
 		this.clear();
 
-		const plugins = await this.#manager.list();
+		const [npmPlugins, marketplaceEntries] = await Promise.all([
+			this.#manager.list(),
+			loadMarketplacePlugins(),
+		]);
 
-		this.#viewComponent = new PluginListComponent(plugins, {
-			onPluginSelect: plugin => this.#showPluginDetail(plugin),
+		const npmEntries: PluginListEntry[] = npmPlugins.map(p => ({
+			name: p.name,
+			version: p.version,
+			enabled: p.enabled,
+			source: "npm",
+			npmPlugin: p,
+		}));
+
+		const allPlugins = [...npmEntries, ...marketplaceEntries];
+
+		this.#viewComponent = new PluginListComponent(allPlugins, {
+			onPluginSelect: entry => this.#showPluginDetail(entry),
 			onCancel: () => this.callbacks.onClose(),
 		});
 
 		this.addChild(this.#viewComponent);
 	}
 
-	#showPluginDetail(plugin: InstalledPlugin): void {
+	#showPluginDetail(entry: PluginListEntry): void {
 		this.#currentView = "detail";
-		this.#currentPlugin = plugin;
+		this.#currentPlugin = entry;
 		this.clear();
 
-		this.#viewComponent = new PluginDetailComponent(plugin, this.#manager, {
-			onEnabledChange: async enabled => {
-				await this.#manager.setEnabled(plugin.name, enabled);
-				this.callbacks.onPluginChanged();
-			},
-			onFeatureChange: async (feature, enabled) => {
-				const current = new Set((await this.#manager.getEnabledFeatures(plugin.name)) ?? []);
-				if (enabled) {
-					current.add(feature);
-				} else {
-					current.delete(feature);
-				}
-				await this.#manager.setEnabledFeatures(plugin.name, [...current]);
-				this.callbacks.onPluginChanged();
-			},
-			onConfigChange: async (key, value) => {
-				await this.#manager.setPluginSetting(plugin.name, key, value);
-				this.callbacks.onPluginChanged();
-			},
-			onBack: () => this.#showPluginList(),
-		});
+		if (entry.source === "npm" && entry.npmPlugin) {
+			this.#viewComponent = new PluginDetailComponent(entry.npmPlugin, this.#manager, {
+				onEnabledChange: async enabled => {
+					await this.#manager.setEnabled(entry.npmPlugin!.name, enabled);
+					this.callbacks.onPluginChanged();
+				},
+				onFeatureChange: async (feature, enabled) => {
+					const current = new Set(
+						(await this.#manager.getEnabledFeatures(entry.npmPlugin!.name)) ?? [],
+					);
+					if (enabled) {
+						current.add(feature);
+					} else {
+						current.delete(feature);
+					}
+					await this.#manager.setEnabledFeatures(entry.npmPlugin!.name, [...current]);
+					this.callbacks.onPluginChanged();
+				},
+				onConfigChange: async (key, value) => {
+					await this.#manager.setPluginSetting(entry.npmPlugin!.name, key, value);
+					this.callbacks.onPluginChanged();
+				},
+				onBack: () => this.#showPluginList(),
+			});
+		} else {
+			// Marketplace plugin
+			this.#viewComponent = new MarketplacePluginDetailComponent(
+				entry,
+				async (enabled: boolean) => {
+					const mgr = new MarketplaceManager({
+						marketplacesRegistryPath: getMarketplacesRegistryPath(),
+						installedRegistryPath: getInstalledPluginsRegistryPath(),
+						marketplacesCacheDir: getMarketplacesCacheDir(),
+						pluginsCacheDir: getPluginsCacheDir(),
+						clearPluginRootsCache: clearClaudePluginRootsCache,
+					});
+					await mgr.setPluginEnabled(entry.marketplaceId!, enabled);
+					this.callbacks.onPluginChanged();
+				},
+				() => this.#showPluginList(),
+			);
+		}
 
 		this.addChild(this.#viewComponent);
 	}

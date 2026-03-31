@@ -4,6 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { clearCache as clearFsCache } from "@oh-my-pi/pi-coding-agent/capability/fs";
 import {
+	ClaudePluginManifest,
 	clearClaudePluginRootsCache,
 	listClaudePluginRoots,
 	parseClaudePluginsRegistry,
@@ -299,6 +300,118 @@ describe("listClaudePluginRoots", () => {
 		const result = await listClaudePluginRoots(tempDir);
 		expect(result.roots).toHaveLength(1);
 		expect(result.roots[0].scope).toBe("user");
+	});
+});
+
+describe("listClaudePluginRoots manifest loading", () => {
+	let tempDir: string;
+
+	beforeEach(async () => {
+		clearClaudePluginRootsCache();
+		clearFsCache();
+		tempDir = await fs.mkdtemp(path.join(os.tmpdir(), "claude-plugins-manifest-test-"));
+	});
+
+	afterEach(async () => {
+		clearClaudePluginRootsCache();
+		await fs.rm(tempDir, { recursive: true, force: true });
+	});
+
+	test("attaches manifest from .claude-plugin/plugin.json when present", async () => {
+		const installPath = path.join(tempDir, "plugins", "test-plugin");
+		await fs.mkdir(path.join(installPath, ".claude-plugin"), { recursive: true });
+
+		const manifest: ClaudePluginManifest = {
+			name: "test-plugin",
+			skills: "./.claude/skills",
+			description: "Test",
+		};
+		await fs.writeFile(
+			path.join(installPath, ".claude-plugin", "plugin.json"),
+			JSON.stringify(manifest),
+		);
+
+		const ompPluginsDir = path.join(tempDir, ".omp", "plugins");
+		await fs.mkdir(ompPluginsDir, { recursive: true });
+		const registry = {
+			version: 2,
+			plugins: {
+				"test-plugin@marketplace": [
+					{
+						scope: "user",
+						installPath,
+						version: "1.0.0",
+						installedAt: "2025-01-01T00:00:00Z",
+						lastUpdated: "2025-01-01T00:00:00Z",
+					},
+				],
+			},
+		};
+		await fs.writeFile(path.join(ompPluginsDir, "installed_plugins.json"), JSON.stringify(registry));
+
+		const result = await listClaudePluginRoots(tempDir);
+		expect(result.roots).toHaveLength(1);
+		expect(result.roots[0].manifest).toBeDefined();
+		expect(result.roots[0].manifest?.skills).toBe("./.claude/skills");
+		expect(result.roots[0].manifest?.description).toBe("Test");
+	});
+
+	test("manifest is undefined when .claude-plugin/plugin.json is missing", async () => {
+		const installPath = path.join(tempDir, "plugins", "no-manifest-plugin");
+		await fs.mkdir(installPath, { recursive: true });
+
+		const ompPluginsDir = path.join(tempDir, ".omp", "plugins");
+		await fs.mkdir(ompPluginsDir, { recursive: true });
+		const registry = {
+			version: 2,
+			plugins: {
+				"no-manifest-plugin@marketplace": [
+					{
+						scope: "user",
+						installPath,
+						version: "1.0.0",
+						installedAt: "2025-01-01T00:00:00Z",
+						lastUpdated: "2025-01-01T00:00:00Z",
+					},
+				],
+			},
+		};
+		await fs.writeFile(path.join(ompPluginsDir, "installed_plugins.json"), JSON.stringify(registry));
+
+		const result = await listClaudePluginRoots(tempDir);
+		expect(result.roots).toHaveLength(1);
+		expect(result.roots[0].manifest).toBeUndefined();
+	});
+
+	test("manifest is undefined when plugin.json has invalid JSON", async () => {
+		const installPath = path.join(tempDir, "plugins", "bad-json-plugin");
+		await fs.mkdir(path.join(installPath, ".claude-plugin"), { recursive: true });
+		await fs.writeFile(
+			path.join(installPath, ".claude-plugin", "plugin.json"),
+			"not valid json{",
+		);
+
+		const ompPluginsDir = path.join(tempDir, ".omp", "plugins");
+		await fs.mkdir(ompPluginsDir, { recursive: true });
+		const registry = {
+			version: 2,
+			plugins: {
+				"bad-json-plugin@marketplace": [
+					{
+						scope: "user",
+						installPath,
+						version: "1.0.0",
+						installedAt: "2025-01-01T00:00:00Z",
+						lastUpdated: "2025-01-01T00:00:00Z",
+					},
+				],
+			},
+		};
+		await fs.writeFile(path.join(ompPluginsDir, "installed_plugins.json"), JSON.stringify(registry));
+
+		const result = await listClaudePluginRoots(tempDir);
+		expect(result.roots).toHaveLength(1);
+		expect(result.roots[0].manifest).toBeUndefined();
 	});
 });
 
