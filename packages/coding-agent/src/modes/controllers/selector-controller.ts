@@ -470,6 +470,7 @@ export class SelectorController {
 						try {
 							await mgr.uninstallPlugin(pluginId, scope);
 							this.ctx.showStatus(`Uninstalled ${pluginId}`);
+							await this.ctx.refreshSlashCommandState();
 						} catch (err) {
 							this.ctx.showStatus(`Uninstall failed: ${err}`);
 						}
@@ -507,6 +508,7 @@ export class SelectorController {
 						const force = installedIds.has(`${name}@${marketplace}`);
 						await mgr.installPlugin(name, marketplace, { force });
 						this.ctx.showStatus(`Installed ${name} from ${marketplace}`);
+						await this.ctx.refreshSlashCommandState();
 					} catch (err) {
 						this.ctx.showStatus(`Install failed: ${err}`);
 					}

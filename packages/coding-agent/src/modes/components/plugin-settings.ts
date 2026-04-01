@@ -18,6 +18,7 @@ import {
 	Text,
 } from "@oh-my-pi/pi-tui";
 import { clearClaudePluginRootsCache } from "../../discovery/helpers";
+import { PluginManager } from "../../extensibility/plugins/manager";
 import { MarketplaceManager } from "../../extensibility/plugins/marketplace/manager";
 import {
 	getInstalledPluginsRegistryPath,
@@ -26,7 +27,6 @@ import {
 	getPluginsCacheDir,
 } from "../../extensibility/plugins/marketplace/registry";
 import type { InstalledPluginEntry } from "../../extensibility/plugins/marketplace/types";
-import { PluginManager } from "../../extensibility/plugins/manager";
 import type { InstalledPlugin, PluginSettingSchema } from "../../extensibility/plugins/types";
 import { getSelectListTheme, getSettingsListTheme, theme } from "../../modes/theme/theme";
 import { DynamicBorder } from "./dynamic-border";
@@ -140,11 +140,7 @@ export class PluginListComponent extends Container {
 			this.addChild(new Text(theme.fg("muted", "  No plugins installed"), 0, 0));
 			this.addChild(new Spacer(1));
 			this.addChild(
-				new Text(
-					theme.fg("dim", "  Install from marketplace: omp marketplace install <name>@<marketplace>"),
-					0,
-					0,
-				),
+				new Text(theme.fg("dim", "  Install from marketplace: omp marketplace install <name>@<marketplace>"), 0, 0),
 			);
 			this.addChild(new Spacer(1));
 			this.addChild(new DynamicBorder());
@@ -603,10 +599,7 @@ export class PluginSettingsComponent extends Container {
 		this.#currentPlugin = null;
 		this.clear();
 
-		const [npmPlugins, marketplaceEntries] = await Promise.all([
-			this.#manager.list(),
-			loadMarketplacePlugins(),
-		]);
+		const [npmPlugins, marketplaceEntries] = await Promise.all([this.#manager.list(), loadMarketplacePlugins()]);
 
 		const npmEntries: PluginListEntry[] = npmPlugins.map(p => ({
 			name: p.name,
@@ -638,9 +631,7 @@ export class PluginSettingsComponent extends Container {
 					this.callbacks.onPluginChanged();
 				},
 				onFeatureChange: async (feature, enabled) => {
-					const current = new Set(
-						(await this.#manager.getEnabledFeatures(entry.npmPlugin!.name)) ?? [],
-					);
+					const current = new Set((await this.#manager.getEnabledFeatures(entry.npmPlugin!.name)) ?? []);
 					if (enabled) {
 						current.add(feature);
 					} else {

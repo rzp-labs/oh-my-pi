@@ -80,9 +80,7 @@ async function loadSlashCommands(ctx: LoadContext): Promise<LoadResult<SlashComm
 			// Resolve one or more command directories from manifest, fall back to "commands"
 			const rawCommands = root.manifest?.commands;
 			const commandDirs = rawCommands
-				? (Array.isArray(rawCommands) ? rawCommands : [rawCommands]).map(p =>
-						path.resolve(root.path, p),
-				  )
+				? (Array.isArray(rawCommands) ? rawCommands : [rawCommands]).map(p => path.resolve(root.path, p))
 				: [path.join(root.path, "commands")];
 			return Promise.all(
 				commandDirs.map(commandsDir =>
@@ -179,9 +177,7 @@ async function loadTools(ctx: LoadContext): Promise<LoadResult<CustomTool>> {
 		roots.map(async root => {
 			const rawTools = root.manifest?.tools;
 			const toolDirs = rawTools
-				? (Array.isArray(rawTools) ? rawTools : [rawTools]).map(p =>
-						path.resolve(root.path, p),
-				  )
+				? (Array.isArray(rawTools) ? rawTools : [rawTools]).map(p => path.resolve(root.path, p))
 				: [path.join(root.path, "tools")];
 			return Promise.all(
 				toolDirs.map(toolsDir =>
