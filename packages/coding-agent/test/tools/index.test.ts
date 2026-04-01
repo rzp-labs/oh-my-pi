@@ -183,7 +183,7 @@ describe("createTools", () => {
 
 	it("excludes GitHub CLI tools by default", async () => {
 		const session = createTestSession();
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).not.toContain("gh_repo_view");
@@ -204,7 +204,7 @@ describe("createTools", () => {
 				"github.enabled": true,
 			}),
 		});
-		const tools = await createTools(session);
+		const { tools } = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).toContain("gh_repo_view");

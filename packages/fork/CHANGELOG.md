@@ -5,7 +5,7 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ---
 
-## Synced through upstream `bf223682` — 105 commits (2026-03-27)
+## Synced through upstream `3f60ba602` — 175 commits (2026-04-02)
 
 ---
 
@@ -71,11 +71,14 @@ project-local `.venv` instead of `~/.omp/python-env`. Added `{ preferManaged }` 
 System prompt addition: instructs the model to use `reuseExistingTerminalWindow: true` on
 JetBrains terminal tool calls to avoid accumulating open tabs.
 
-### fix(await): suppress/pre-acknowledge deliveries to prevent system-notice spam (`a67c4318`, `370412b9`)
+### fix(await): suppress/pre-acknowledge deliveries to prevent system-notice spam (`a67c4318`, `370412b9`, `53dafb00`)
 
 Two-part fix for stale system-notice spam when awaiting batch async tasks.
 1. Pre-suppress watched job IDs via `acknowledgeDeliveries()` before blocking.
 2. Replace `Promise.race` with `Promise.allSettled` so all jobs settle before returning.
+
+`53dafb00` was skipped during 6ef48e02 rebase (upstream absorbed the `await.md` doc change);
+the `await-tool.ts` code change was re-applied manually in post-rebase cleanup.
 
 ### fix(extensions): load SSH hosts in extension control center (`289e6a75`)
 

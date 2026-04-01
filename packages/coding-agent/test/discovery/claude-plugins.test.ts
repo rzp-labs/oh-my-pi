@@ -4,7 +4,7 @@ import * as os from "node:os";
 import * as path from "node:path";
 import { clearCache as clearFsCache } from "@oh-my-pi/pi-coding-agent/capability/fs";
 import {
-	ClaudePluginManifest,
+	type ClaudePluginManifest,
 	clearClaudePluginRootsCache,
 	listClaudePluginRoots,
 	parseClaudePluginsRegistry,
@@ -326,10 +326,7 @@ describe("listClaudePluginRoots manifest loading", () => {
 			skills: "./.claude/skills",
 			description: "Test",
 		};
-		await fs.writeFile(
-			path.join(installPath, ".claude-plugin", "plugin.json"),
-			JSON.stringify(manifest),
-		);
+		await fs.writeFile(path.join(installPath, ".claude-plugin", "plugin.json"), JSON.stringify(manifest));
 
 		const ompPluginsDir = path.join(tempDir, ".omp", "plugins");
 		await fs.mkdir(ompPluginsDir, { recursive: true });
@@ -386,10 +383,7 @@ describe("listClaudePluginRoots manifest loading", () => {
 	test("manifest is undefined when plugin.json has invalid JSON", async () => {
 		const installPath = path.join(tempDir, "plugins", "bad-json-plugin");
 		await fs.mkdir(path.join(installPath, ".claude-plugin"), { recursive: true });
-		await fs.writeFile(
-			path.join(installPath, ".claude-plugin", "plugin.json"),
-			"not valid json{",
-		);
+		await fs.writeFile(path.join(installPath, ".claude-plugin", "plugin.json"), "not valid json{");
 
 		const ompPluginsDir = path.join(tempDir, ".omp", "plugins");
 		await fs.mkdir(ompPluginsDir, { recursive: true });

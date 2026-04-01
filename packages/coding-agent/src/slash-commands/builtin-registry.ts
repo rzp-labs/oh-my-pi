@@ -686,6 +686,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<BuiltinSlashCommandSpec> = [
 						const marketplace = parsed.installSpec.slice(atIdx + 1);
 						await mgr.installPlugin(name, marketplace, { force: parsed.force, scope: parsed.scope });
 						runtime.ctx.showStatus(`Installed ${name} from ${marketplace}`);
+						await runtime.ctx.refreshSlashCommandState();
 						break;
 					}
 					case "uninstall": {
@@ -704,6 +705,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<BuiltinSlashCommandSpec> = [
 						}
 						await mgr.uninstallPlugin(uninstArgs.pluginId, uninstArgs.scope);
 						runtime.ctx.showStatus(`Uninstalled ${uninstArgs.pluginId}`);
+						await runtime.ctx.refreshSlashCommandState();
 						break;
 					}
 					case "installed": {
@@ -831,6 +833,7 @@ const BUILTIN_SLASH_COMMAND_REGISTRY: ReadonlyArray<BuiltinSlashCommandSpec> = [
 						const isEnable = sub === "enable";
 						await mgr.setPluginEnabled(parsed.pluginId, isEnable, parsed.scope);
 						runtime.ctx.showStatus(`${isEnable ? "Enabled" : "Disabled"} ${parsed.pluginId}`);
+						await runtime.ctx.refreshSlashCommandState();
 						break;
 					}
 					default: {
