@@ -71,13 +71,17 @@ If a patch conflicts, rebase pauses at that commit. For each conflict:
 
 Standing rules:
 - **NEVER modify upstream CHANGELOG.md** — accept upstream's version entirely
-  (`git checkout --theirs <file>`) and carry fork-local changes in
+  (`git checkout --ours <file>`) and carry fork-local changes in
   `packages/fork/CHANGELOG.md` instead.
 - For code conflicts: apply the patch's intent onto upstream's new structure.
   The goal is to preserve what the patch was doing, not preserve its exact lines.
 - **Check for later patches on the same file** before resolving. Run
   `git log REBASE_HEAD..ORIG_HEAD -- <file>` to see queued patches that also touch it.
   Resolve in a shape those patches can apply cleanly to — don't satisfy only the current patch.
+
+> **Rebase conflict resolution semantics** (opposite of merge):
+> - `git checkout --ours <file>` → take **upstream's** version (HEAD during rebase)
+> - `git checkout --theirs <file>` → take **our fork's** version (commit being replayed)
 
 After resolving each conflicted file: `git add <file>` then `git rebase --continue`.
 
@@ -116,6 +120,18 @@ bun test test/async-job-manager.test.ts    # if async/job-manager.ts changed
 ```
 
 Do not run the full test suite unless asked.
+
+### 7a. Review for semantic conflicts
+
+A clean rebase and passing tests do not mean every fork feature is still coherent.
+For each substantive incoming upstream commit, cross-check against `packages/fork/FEATURES.md`:
+
+- **Functional duplication**: did upstream ship what a fork patch does? If so, drop the patch (`git rebase -i` to remove it from the stack) and mark it upstreamed in the CHANGELOG.
+- **Interface assumption violated**: does a fork patch reference an API, parameter, or file that upstream restructured? Update the patch to the new structure.
+- **Prompt/guidance staleness**: do any fork system-prompt patches reference tool parameters or behaviours that upstream changed? Update the guidance.
+- **Intentional gaps**: if a fork feature was skipped (taken `--ours`) due to the upstream-first policy, record the gap explicitly in FEATURES.md under the feature's entry.
+
+This step is especially important when incoming upstream commits touch files that appear in FEATURES.md.
 
 ### 8. Update packages/fork/CHANGELOG.md
 
