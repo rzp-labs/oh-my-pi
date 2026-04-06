@@ -95,7 +95,7 @@ describe("ast_grep parse errors", () => {
 				`---- MODULE Spec ----\n(* --algorithm Demo\nvariables x = 0;\nbegin\n  Inc:\n    x := x + 1;\nend algorithm; *)\n====\n`,
 			);
 
-			const tools = await createTools(createTestSession(tempDir));
+			const { tools } = await createTools(createTestSession(tempDir));
 			const tool = tools.find(entry => entry.name === "ast_grep");
 			expect(tool).toBeDefined();
 
