@@ -69,25 +69,31 @@ If a patch conflicts, rebase pauses at that commit. For each conflict:
 
 **Ask the user to approve each resolution before applying it.**
 
-Standing rules:
-- **NEVER modify upstream CHANGELOG.md** — accept upstream's version entirely
-  (`git checkout --ours <file>`) and carry fork-local changes in
-  `packages/fork/CHANGELOG.md` instead.
-- For code conflicts: apply the patch's intent onto upstream's new structure.
-  The goal is to preserve what the patch was doing, not preserve its exact lines.
-- **Check for later patches on the same file** before resolving. Run
-  `git log REBASE_HEAD..ORIG_HEAD -- <file>` to see queued patches that also touch it.
-  Resolve in a shape those patches can apply cleanly to — don't satisfy only the current patch.
+**Reading conflict markers**
 
-> **Rebase conflict resolution semantics** (opposite of merge):
-> - `git checkout --ours <file>` → take **upstream's** version (HEAD during rebase)
-> - `git checkout --theirs <file>` → take **our fork's** version (commit being replayed)
+During a rebase, conflict markers always mean the same thing — no need to reason about `--ours`/`--theirs`:
+
+```
+<<<<<<< HEAD          ← upstream's version (current state being built onto)
+||||||| parent of <sha>  ← base (what both sides started from)
+=======
+              ← fork's commit being replayed
+>>>>>>> <sha>
+```
+
+When you want upstream's version of a file, look at the `HEAD` section. When you want the fork's version, look at the bottom section.
+
+**Standing rules:**
+
+- **NEVER modify upstream `CHANGELOG.md`** — the `HEAD` section is upstream's version; accept it entirely and carry fork-local changes in `packages/fork/CHANGELOG.md` instead.
+- **Lock files (`bun.lock`)** — take either side and mark resolved; `bun install` in step 6 regenerates the lock unconditionally. Convention: `git checkout --theirs bun.lock` (consistent with past syncs).
+- **For code conflicts**: apply the patch's intent onto upstream's new structure. The goal is to preserve what the patch was doing, not preserve its exact lines.
+- **Check for later patches on the same file** before resolving. Run `git log REBASE_HEAD..ORIG_HEAD -- <file>` to see queued patches that also touch it. Resolve in a shape those patches can apply cleanly to — don't satisfy only the current patch.
 
 After resolving each conflicted file: `git add <file>` then `git rebase --continue`.
 
 If a patch becomes a no-op after resolution (upstream already incorporated the
 same change), drop it: `git rebase --skip`.
-
 ### 5. Pop stash
 
 If work was stashed in step 3:
