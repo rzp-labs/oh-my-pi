@@ -139,7 +139,7 @@ Stable registry of fork-only behavior keyed by purpose, not commit SHA. Use this
 - **Purpose:** Tracks the latest per-file write baseline across sequential edits in a turn so older hashline anchors remain resolvable after earlier writes.
 - **Files:** `packages/coding-agent/src/patch/edit-queue.ts`, `packages/coding-agent/src/patch/index.ts`, `packages/coding-agent/src/sdk.ts`, `packages/coding-agent/src/tools/index.ts`
 - **Semantic conflicts:** Upstream restructuring of the patch execution path, especially in `patch/index.ts`, can invalidate queue insertion points or make the baseline tracking redundant.
-- **Notes:** Most conflict-prone fork feature. **Intentional gap (077be19ad sync):** `read.ts` flush (`editQueue?.flush(absolutePath)` before text-file reads) was not re-applied under upstream-first policy when upstream restructured the text-file branch to add chunk mode. Without it, the queue baseline is not invalidated when the model re-reads an edited file between writes. If sequential-edit anchor drift re-emerges, restore the flush at the top of the `else {` block in `read.ts` before the chunk mode check.
+- **Notes:** Most conflict-prone fork feature. **Intentional gap (f3c4d9ef1 sync):** `read.ts` flush (`editQueue?.flush(absolutePath)` before text-file reads) was not re-applied under upstream-first policy when upstream restructured the text-file branch with chunk mode enhancements. Without it, the queue baseline is not invalidated when the model re-reads an edited file between writes. If sequential-edit anchor drift re-emerges, restore the flush at the top of the `else {` block in `read.ts` before the chunk mode check.
 
 ### bash-interceptor-mode-aware
 
