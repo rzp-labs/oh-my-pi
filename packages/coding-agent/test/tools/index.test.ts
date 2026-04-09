@@ -103,7 +103,7 @@ describe("createTools", () => {
 				reason: "missing python",
 			},
 		);
-		const { tools } = await createTools(session, ["python"])
+		const tools = await createTools(session, ["python"]);
 		const names = tools.map(t => t.name);
 
 		expect(names).toContain("bash");
@@ -137,7 +137,7 @@ describe("createTools", () => {
 
 	it("lowercases requested tool subset", async () => {
 		const session = createTestSession();
-		const { tools } = await createTools(session, ["Read", "Write"])
+		const tools = await createTools(session, ["Read", "Write"]);
 		const names = tools.map(t => t.name);
 
 		expect(names).toEqual(["read", "write", "exit_plan_mode"]);
@@ -190,7 +190,7 @@ describe("createTools", () => {
 				"calc.enabled": false,
 			}),
 		});
-		const { tools } = await createTools(session)
+		const tools = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).not.toContain("find");
@@ -212,7 +212,7 @@ describe("createTools", () => {
 			}),
 			...createDiscoverySessionHooks(),
 		});
-		const { tools } = await createTools(session)
+		const tools = await createTools(session);
 		const names = tools.map(t => t.name);
 
 		expect(names).toContain("search_tool_bm25");

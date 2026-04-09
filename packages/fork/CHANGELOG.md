@@ -5,11 +5,22 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ---
 
-## Synced through upstream `13.9.7` (`092681ba`) (2026-03-07)
+## Synced through upstream `14.0.1` (`15fc3b153`) (2026-04-09)
 
 ---
 
 ## Active Local Patches
+
+~~### hashline-edit-queue~~
+
+**Dropped** — upstream's hashline mode now returns self-correcting anchor errors (showing updated `LINE#ID` refs inline) when anchors are stale. The queue's "prevent the error" approach is superseded. Feature removed from FEATURES.md. History preserved in git at the patches that implemented it.
+
+~~### lsp-auto-detect-always (`a624d91e1`)~~
+~~### lsp-ide-managed-discovery (`5f8d8d856`)~~
+~~### ty-lsp-server (`c0f2fb21a`)~~
+
+**Absorbed** — upstream v14.0.1 now ships unconditional auto-detection + IDE-managed LSP binary discovery + `ty` as a default server. All three patches dropped.
+
 
 ~~### fix(session): default thinkingLevel to "off" in buildSessionContext (`2dedc985`)~~
 

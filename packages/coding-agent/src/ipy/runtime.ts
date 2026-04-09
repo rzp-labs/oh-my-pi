@@ -212,7 +212,6 @@ export function resolvePythonRuntime(
 		}
 	}
 
-<<<<<<< HEAD
 	const managed = resolveManagedPythonCandidate();
 	if (fs.existsSync(managed.pythonPath)) {
 		env.VIRTUAL_ENV = managed.venvPath;
