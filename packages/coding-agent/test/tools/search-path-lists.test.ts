@@ -109,7 +109,7 @@ describe("search tool path lists", () => {
 	});
 
 	it("grep accepts quoted directory paths", async () => {
-		const { tools } = await createTools(createTestSession(tempDir));
+		const tools = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "grep");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing grep tool");
@@ -128,7 +128,7 @@ describe("search tool path lists", () => {
 	});
 
 	it("ast_grep accepts quoted path and glob filters", async () => {
-		const { tools } = await createTools(createTestSession(tempDir));
+		const tools = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "ast_grep");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing ast_grep tool");
@@ -243,7 +243,7 @@ describe("search tool path lists", () => {
 	});
 
 	it("find accepts quoted directory patterns", async () => {
-		const { tools } = await createTools(createTestSession(tempDir));
+		const tools = await createTools(createTestSession(tempDir));
 		const tool = tools.find(entry => entry.name === "find");
 		expect(tool).toBeDefined();
 		if (!tool) throw new Error("Missing find tool");
