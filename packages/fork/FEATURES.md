@@ -7,9 +7,7 @@ Stable registry of fork-only behavior keyed by purpose, not commit SHA. Use this
 - [mcp-exclusions](#mcp-exclusions)
 - [git-flow-publish-gate](#git-flow-publish-gate)
 - [python-setup-guard](#python-setup-guard)
-- [python-startup-notice](#python-startup-notice)
 - [python-managed-venv](#python-managed-venv)
-- [mcp-terminal-reuse](#mcp-terminal-reuse)
 - [await-delivery-suppression](#await-delivery-suppression)
 - [extensions-ssh-host-loading](#extensions-ssh-host-loading)
 - [agents-md-discovery](#agents-md-discovery)
@@ -41,14 +39,6 @@ Stable registry of fork-only behavior keyed by purpose, not commit SHA. Use this
 - **Semantic conflicts:** Upstream refactors to setup flow or Python runtime error handling could obsolete this guard or move the correct fix point.
 - **Notes:** Low conflict surface; verify setup still reports unavailability rather than throwing.
 
-### python-startup-notice
-
-- **Status:** `active`
-- **Purpose:** Changes tool creation to return `{ tools, notices }` so Python unavailability can be surfaced once at startup instead of failing later at call time.
-- **Files:** `packages/coding-agent/src/sdk.ts`, `packages/coding-agent/src/tools/index.ts`, `packages/coding-agent/src/main.ts`
-- **Semantic conflicts:** Upstream changes to `createTools()` return shape, agent session wiring, or startup notification delivery would invalidate this integration.
-- **Notes:** This return-type change affects every caller and test that touches `createTools()`.
-
 ### python-managed-venv
 
 - **Status:** `active`
@@ -56,14 +46,6 @@ Stable registry of fork-only behavior keyed by purpose, not commit SHA. Use this
 - **Files:** `packages/coding-agent/src/ipy/runtime.ts`, `packages/coding-agent/src/ipy/gateway-coordinator.ts`, `packages/coding-agent/src/ipy/kernel.ts`, `packages/coding-agent/src/cli/setup-cli.ts`
 - **Semantic conflicts:** Upstream changes to Python runtime resolution order, gateway startup, or kernel availability checks could reintroduce wrong-venv selection.
 - **Notes:** This specifically protects sync-upstream workflows from project-local `.venv` leakage.
-
-### mcp-terminal-reuse
-
-- **Status:** `active`
-- **Purpose:** Instructs the model to reuse JetBrains terminal windows when MCP tools support it so sessions do not accumulate redundant tabs.
-- **Files:** `packages/coding-agent/src/prompts/system/system-prompt.md`
-- **Semantic conflicts:** Upstream restructuring of the system prompt section or shipping the same instruction themselves could require relocating or removing this text.
-- **Notes:** Check prompt placement on every sync because prompt files drift often.
 
 ### await-delivery-suppression
 

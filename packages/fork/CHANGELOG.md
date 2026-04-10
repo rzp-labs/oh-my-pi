@@ -5,7 +5,7 @@ This file is gitignored to avoid merge conflicts with upstream CHANGELOG.md.
 
 ---
 
-## Synced through upstream `14.0.1` (`15fc3b153`) (2026-04-09)
+## Synced through upstream `14.0.4` (`b196f4712`) (2026-04-10)
 
 ---
 
@@ -34,12 +34,9 @@ On a machine with no managed env and no Python on PATH, `resolvePythonRuntime` t
 returning a structured unavailable result. Wrapped in try-catch. Also made `python-runtime`
 tests platform-aware (VENV_BIN/VENV_PYTHON constants).
 
-### feat(tools): surface startup notice when Python tools unavailable (`15c393c7`)
+~~### feat(tools): surface startup notice when Python tools unavailable (`15c393c7`)~~
 
-Added `StartupNotice` interface; changed `createTools` return type to
-`Promise<{ tools: Tool[]; notices: StartupNotice[] }>`. When Python tools are configured but
-the preflight fails, a warn notice is pushed and surfaced in the TUI before interactive mode
-starts. Wired through `CreateAgentSessionResult` and `main.ts` notification loop.
+**Dropped** — `a7784549f` upstream introduced `ToolChoiceQueue` and significantly restructured `sdk.ts` and `tools/index.ts`. Conflict cost exceeded the feature's value; upstream shape (`createTools` returns `Tool[]`) is sufficient. All derivative test-fix patches also dropped.
 
 ### fix(ipy): prefer managed venv in gateway and preflight checks (`a5346f14`)
 
@@ -49,10 +46,9 @@ project-local `.venv` instead of `~/.omp/python-env`. Added `{ preferManaged }` 
 `{ preferManaged: true }`. Unified `checkPythonSetup` to use the same resolution order.
 17 unit tests for `resolvePythonRuntime`.
 
-### feat(coding-agent): instruct model to reuse MCP terminal windows (`2a0d6809`)
+~~### feat(coding-agent): instruct model to reuse MCP terminal windows (`2a0d6809`)~~
 
-System prompt addition: instructs the model to use `reuseExistingTerminalWindow: true` on
-JetBrains terminal tool calls to avoid accumulating open tabs.
+**Dropped** — `d69995a7f` upstream rewrote `system-prompt.md`; maintaining precise placement of this instruction across every sync is not worth the cost.
 
 ### fix(await): suppress/pre-acknowledge deliveries to prevent system-notice spam (`a1f1dc5b`, `18d2b088`)
 
@@ -125,10 +121,6 @@ upstream registry on every push.
 Fork-local MCP server configuration (exclusions for unused servers) and context window
 safeguards in session messages.
 
-### fix(test): update tests for createTools return shape (`5a30cf2c`, `36b0cdc9`)
+### fix(test): remove startup-notice destructuring from tests (`b75de780b`)
 
-Updated test files to destructure `{ tools }` from `createTools()` after upstream changed
-the return type from `Tool[]` to `{ tools: Tool[]; notices: StartupNotice[] }`.
-During 13.9.7 sync: upstream AST tool refactor (`0433900c`) and lowercase normalization (`1acd2816`)
-left three more bare `createTools()` calls in `ast-edit.test.ts`, `ast-grep.test.ts`, and
-`index.test.ts`. Fixed all three during rebase.
+Post-rebase cleanup: `ast-grep.test.ts` and `search-path-lists.test.ts` had `const { tools } =` destructuring left over from the dropped `python-startup-notice` patch. Reverted to `const tools =` to match upstream `createTools` return type (`Tool[]`).
